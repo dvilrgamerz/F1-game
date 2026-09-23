@@ -1,15 +1,17 @@
 {
-  "name": "dvilr-gp-web-v0-1",
+  "name": "dvilr-gp-web",
   "private": true,
-  "version": "2.0.0",
+  "version": "3.0.0-alpha.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "three": "^0.180.0"
+    "three": "^0.180.0",
+    "@dimforge/rapier3d-compat": "^0.20.0"
   },
   "devDependencies": {
     "@types/three": "^0.180.0",
