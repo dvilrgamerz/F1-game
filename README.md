@@ -1,73 +1,113 @@
-# DVILR GP — Web Formula Racing v2
+# DVILR GP — Web Formula Racing V3 Alpha
 
-A browser-first 3D open-wheel racing game built with Three.js, TypeScript and Vite. The goal is to capture the systems-level depth of modern Formula racing games while keeping the branding, cars, drivers and circuit original.
+DVILR GP is an original browser-based open-wheel racing project built with Three.js, TypeScript and Vite. V3 begins the transition from the V2 kinematic prototype to a much more physically grounded Formula-style racing architecture.
 
-## V2 highlights
+## What is playable now
 
-### Track and environment
-- Original high-speed circuit
-- Raised red/white corner kerbs
-- Green runoff around the racing surface
-- Gravel traps at selected high-risk corners
-- Instanced track barriers and trackside markers
-- Instanced vegetation for better depth without hundreds of separate draw calls
-- Visual pit-lane route beside the main straight
-- Start/finish line and 5-light race start
+The current main game still keeps the proven lightweight V2 driving loop so the project remains playable while the physical V3 systems are built underneath it.
 
-### Driving model
-- 120 Hz fixed-step simulation
-- Speed-dependent steering
-- Basic aerodynamic grip scaling with speed
-- Surface-specific grip for asphalt, kerb, runoff and gravel
-- Tyre wear
-- Tyre temperature with an operating window
-- Heat-driven tyre degradation
-- ERS/overtake deployment and recharge
-- Slipstream that reduces drag behind another car
-- Two DRS-style zones
-- DRS eligibility based on race lap and a nearby car ahead
-- Automatic DRS closure under braking
+Visible V3 upgrades already on main:
 
-### Racing
-- 20-car field: player + 19 AI cars
-- Five-lap Grand Prix
-- AI slows according to local circuit curvature
-- AI uses changing lateral racing lines instead of one fixed train
-- Live race position
-- Lap timing and best lap
-- Three cameras: chase, cockpit and broadcast
-- Full start-light sequence
+- 10-lap original Grand Prix
+- 20-car field
+- New **Aurora International Circuit**
+- More complex circuit shape and elevation
+- Raised kerbs, runoff, gravel, barriers, vegetation and pit-lane visuals
+- More detailed procedural Formula-style car with:
+  - sidepods
+  - halo
+  - driver helmet/visor
+  - front/rear wing endplates
+  - diffuser
+  - suspension arms
+  - wheel rims and brake discs
+- Metadata-driven DRS zones
+- ERS, slipstream, tyre temperature and wear
+- Five-light race start
+- Chase, cockpit and broadcast cameras
+- Minimap
+- Chequered-flag finish
+- Full 20-car classification screen after the race
 
-### V2 HUD
-- Speed and automatic gear display
-- Throttle and brake telemetry
-- ERS level
-- Tyre life
-- Tyre temperature
-- DRS ready/active indication
-- Slipstream indication
-- Current track surface
-- Live circuit minimap
-- Desktop and mobile layouts
+## V3 physics architecture now in the repo
 
-## Controls
+The new code under `src/v3/` is the foundation for replacing the old scalar-speed model.
 
-- W / Up — throttle
-- S / Down — brake
-- A / D or Left / Right — steer
-- Space — hold ERS overtake
-- E — open/close DRS when eligible
-- C — change camera
-- R — reset car
-- Esc — pause
+### Physics
 
-Touch devices also get steering, throttle, brake, ERS and DRS controls.
+- Rapier 3D compatibility package
+- Rigid-body world wrapper
+- Four-wheel state types
+- Magic-Formula-inspired tyre force model
+- Combined-slip friction ellipse
+- Load-sensitive grip
+- Temperature and wear grip scaling
+- Soft / Medium / Hard compound definitions
+- Torque-curve powertrain
+- 8-speed sequential-style ratios
+- Engine braking
+- Rear LSD torque split
+- Front/rear aerodynamic downforce
+- Drag
+- DRS aero changes
+- Slipstream/wake aero reduction
+- ERS energy/deployment model
 
-## Run locally
+### Race systems
+
+- Race phase state machine
+- Grid → lights → racing → finishing → results
+- Driver progress/classification types
+- Penalty-time-ready classification
+- Configurable race length
+- Track metadata for:
+  - sectors
+  - DRS zones
+  - pit entry/exit
+  - pit speed
+  - elevation/control points
+
+### AI
+
+- New physical-driver input interface
+- Target-speed control
+- steering from heading/lateral error
+- traffic reaction
+- DRS/ERS decision hooks
+
+## Source layout
+
+```
+src/
+  main.ts                 current playable renderer/game loop
+  v3/
+    index.ts
+    types.ts
+    ai/
+      AiDriver.ts
+    physics/
+      AeroModel.ts
+      EnergySystem.ts
+      Powertrain.ts
+      RapierWorld.ts
+      TireModel.ts
+    race/
+      RaceDirector.ts
+    track/
+      auroraRing.ts
+```
+
+## Install and run
 
 ```bash
 npm install
 npm run dev
+```
+
+Type-check:
+
+```bash
+npm run typecheck
 ```
 
 Production build:
@@ -76,41 +116,27 @@ Production build:
 npm run build
 ```
 
-## Stack
+## Important V3 status
 
-- Three.js
-- TypeScript
-- Vite
-- DOM-based racing HUD
-- InstancedMesh for repeated track objects
+V3 is now a **real architecture migration**, but the full physical 20-car simulator is not finished yet.
 
-## Why v2 is structured this way
+The current rendered race still uses the old lightweight movement loop. The new Rapier/tyre/powertrain/aero systems are in the repo so the next migration can move the player car first, then AI cars, without throwing away the playable game.
 
-The simulation remains separate from Three.js rendering state. That gives future versions room for a real four-wheel tyre model, suspension, collisions, pit rules, damage, multiplayer and replays without turning the scene graph into the source of truth.
+The correct order is:
 
-Three.js recommends `InstancedMesh` when many objects reuse the same geometry/material because it reduces draw calls. V2 uses that pattern for barriers, markers, vegetation and kerbs.
+1. Replace player movement with Rapier + four wheel contacts.
+2. Tune braking, wheelspin, lockups, suspension and aero.
+3. Move all 19 AI cars onto the same physical vehicle model.
+4. Add real car-to-car/barrier collisions and damage.
+5. Add working pit lane/stops, compounds and fuel.
+6. Add flags, penalties, VSC/safety car and track limits.
+7. Add weather/wet track/drying line.
+8. Add replay, gamepad/wheel support and multiplayer-ready snapshots.
 
-## Next: v3
+## Research basis
 
-- Four independent wheels with slip ratio + slip angle
-- Brake lockups and wheelspin
-- Differential + brake bias
-- Suspension/load transfer
-- Actual barrier/car collision response with Rapier
-- Pit entry/exit gameplay and pit limiter
-- Soft/medium/hard tyre compounds
-- Fuel load and race strategy
-- Yellow flags, penalties and track limits
-- Dynamic weather + wet grip + drying line
-- Better overtaking/defending AI
-- Replays and race highlights
-- Garage/car-setup screen
-- Controller/gamepad mapping
-
-## Research notes
-
-See `V2_RESEARCH.md` and `F1_25_RESEARCH_BLUEPRINT.md`.
+V3 architecture follows current Rapier browser physics capabilities and standard real-time vehicle simulation techniques. Rapier's official JS bindings support rigid bodies, colliders, forces at world-space points and browser/WebAssembly use. The tyre model is a simplified empirical model inspired by Pacejka-style vehicle dynamics rather than a claim to reproduce confidential real Formula One tyre data.
 
 ## Branding / licensing
 
-This project is Formula-racing inspired. It should use original game branding, fictional teams/drivers, original liveries, original sponsors and original circuit environments unless separate permission is obtained for licensed content.
+This is an original Formula-style racing game. Official Formula One team names, logos, liveries, driver likenesses, EA/Codemasters game assets and scanned licensed circuit geometry are not included.
