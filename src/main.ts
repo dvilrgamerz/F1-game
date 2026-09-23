@@ -743,6 +743,7 @@ document.querySelector<HTMLButtonElement>('#start-btn')!.addEventListener('click
     aiCars[i].lap = 0;
     aiCars[i].speed = 0;
   }
+  simTime = 0;
   raceStartAt = performance.now();
   player.lapStartedAt = 0;
   els.start.classList.remove('active');
