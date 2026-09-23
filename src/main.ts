@@ -81,6 +81,59 @@ function makeTrackRibbon(width: number, y: number, material: THREE.Material): TH
 scene.add(makeTrackRibbon(TRACK_WIDTH + 3.2, 0.08, new THREE.MeshStandardMaterial({ color: 0xb7b7b0, roughness: 1 })));
 scene.add(makeTrackRibbon(TRACK_WIDTH, 0.14, new THREE.MeshStandardMaterial({ color: 0x2a2b2c, roughness: 0.86, metalness: 0.04 })));
 
+// Formula-style kerbs: place red/white raised strips on the inside of meaningful bends.
+function addCornerKerbs() {
+  const kerbSamples = 240;
+  const placements: Array<{ t: number; sideSign: number; red: boolean }> = [];
+
+  for (let i = 0; i < kerbSamples; i++) {
+    const t = i / kerbSamples;
+    const nextT = ((i + 1) % kerbSamples) / kerbSamples;
+    const tangent = trackCurve.getTangentAt(t).normalize();
+    const nextTangent = trackCurve.getTangentAt(nextT).normalize();
+
+    // Y component of tangent cross-product in the XZ plane.
+    const turn = tangent.z * nextTangent.x - tangent.x * nextTangent.z;
+    if (Math.abs(turn) < 0.008) continue;
+
+    // sideSign +1 uses the curve's left normal, -1 the right normal.
+    const sideSign = turn < 0 ? 1 : -1;
+    placements.push({ t, sideSign, red: i % 2 === 0 });
+  }
+
+  const kerbGeo = new THREE.BoxGeometry(1.45, 0.13, 3.4);
+  const redMat = new THREE.MeshStandardMaterial({ color: 0xd71920, roughness: 0.82 });
+  const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f2, roughness: 0.82 });
+  const redCount = placements.filter(k => k.red).length;
+  const whiteCount = placements.length - redCount;
+  const redKerbs = new THREE.InstancedMesh(kerbGeo, redMat, redCount);
+  const whiteKerbs = new THREE.InstancedMesh(kerbGeo, whiteMat, whiteCount);
+  const dummy = new THREE.Object3D();
+  let redIndex = 0;
+  let whiteIndex = 0;
+
+  for (const k of placements) {
+    const p = trackCurve.getPointAt(k.t);
+    const tangent = trackCurve.getTangentAt(k.t).normalize();
+    const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+
+    dummy.position.copy(p).addScaledVector(side, k.sideSign * (TRACK_WIDTH / 2 + 0.58));
+    dummy.position.y = 0.22;
+    dummy.rotation.set(0, Math.atan2(tangent.x, tangent.z), 0);
+    dummy.updateMatrix();
+
+    if (k.red) redKerbs.setMatrixAt(redIndex++, dummy.matrix);
+    else whiteKerbs.setMatrixAt(whiteIndex++, dummy.matrix);
+  }
+
+  redKerbs.castShadow = true;
+  redKerbs.receiveShadow = true;
+  whiteKerbs.castShadow = true;
+  whiteKerbs.receiveShadow = true;
+  scene.add(redKerbs, whiteKerbs);
+}
+addCornerKerbs();
+
 // Start line
 const startP = trackCurve.getPointAt(0);
 const startT = trackCurve.getTangentAt(0).normalize();
@@ -182,6 +235,7 @@ const player = {
   tyre: 1,
   drs: false,
   ersDeploy: false,
+  onKerb: false,
   offTrack: false
 };
 scene.add(player.car);
@@ -276,7 +330,8 @@ function updatePlayer(dt: number, raceTime: number) {
   const trackInfo = nearestTrackProgress(player.position);
   player.previousProgress = player.progress;
   player.progress = trackInfo.progress;
-  player.offTrack = trackInfo.distance > TRACK_WIDTH * .55;
+  player.onKerb = trackInfo.distance > TRACK_WIDTH * .47 && trackInfo.distance <= TRACK_WIDTH * .57;
+  player.offTrack = trackInfo.distance > TRACK_WIDTH * .57;
 
   const drsZone = player.progress > .06 && player.progress < .20;
   if (!drsZone) player.drs = false;
@@ -285,7 +340,7 @@ function updatePlayer(dt: number, raceTime: number) {
   const engineAccel = 24 * player.throttle * (1 - Math.min(player.speed / maxSpeed, .98));
   const ersAccel = player.ersDeploy ? 6.5 : 0;
   const drag = .0039 * player.speed * player.speed;
-  const rolling = player.offTrack ? 5.8 : .55;
+  const rolling = player.offTrack ? 5.8 : player.onKerb ? 1.2 : .55;
   const braking = 35 * player.brake;
   player.speed += (engineAccel + ersAccel - drag - rolling - braking) * dt;
   player.speed = THREE.MathUtils.clamp(player.speed, 0, maxSpeed);
@@ -294,7 +349,7 @@ function updatePlayer(dt: number, raceTime: number) {
   else player.ers = Math.min(1, player.ers + dt * (player.throttle < .3 ? .038 : .012));
 
   const steeringLimit = THREE.MathUtils.lerp(.58, .12, THREE.MathUtils.clamp(player.speed / 95, 0, 1));
-  const grip = player.offTrack ? .52 : THREE.MathUtils.lerp(.94, .82, 1 - player.tyre);
+  const grip = player.offTrack ? .52 : player.onKerb ? .86 : THREE.MathUtils.lerp(.94, .82, 1 - player.tyre);
   const yawRate = player.steer * steeringLimit * grip * (player.speed / 13) / (1 + player.speed / 36);
   player.heading += yawRate * dt;
 
@@ -444,7 +499,7 @@ function updateHUD(raceTime: number, now: number) {
   const drsZone = player.progress > .06 && player.progress < .20;
   els.drs.classList.toggle('active', player.drs && drsZone);
   els.ersInd.classList.toggle('active', player.ersDeploy);
-  els.status.textContent = finished ? 'CHEQUERED FLAG' : player.offTrack ? 'OFF TRACK' : cameraMode.toUpperCase();
+  els.status.textContent = finished ? 'CHEQUERED FLAG' : player.offTrack ? 'OFF TRACK' : player.onKerb ? 'KERB' : cameraMode.toUpperCase();
 
   if (!raceStarted) return;
   const elapsed = (now - raceStartAt) / 1000;
