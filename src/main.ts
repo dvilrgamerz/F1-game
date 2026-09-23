@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import './styles.css';
+import { AURORA_RING } from './v3/track/auroraRing';
 
 type CameraMode = 'chase' | 'cockpit' | 'broadcast';
 type TouchAction = 'left' | 'right' | 'throttle' | 'brake' | 'ers';
@@ -40,14 +41,12 @@ grass.rotation.x = -Math.PI / 2;
 grass.receiveShadow = true;
 scene.add(grass);
 
-const trackPoints = [
-  [-250, -25], [-180, -145], [-25, -195], [125, -180], [250, -115], [325, 0],
-  [285, 120], [170, 175], [55, 150], [-25, 95], [-120, 145], [-245, 125], [-320, 40]
-].map(([x, z]) => new THREE.Vector3(x, 0.12, z));
+const trackPoints = AURORA_RING.controlPoints.map(({ x, y, z }) => new THREE.Vector3(x, y, z));
 
 const trackCurve = new THREE.CatmullRomCurve3(trackPoints, true, 'centripetal', 0.45);
-const TRACK_WIDTH = 15.5;
-const TRACK_SAMPLES = 1100;
+const TRACK_WIDTH = AURORA_RING.widthMeters;
+const RACE_LAPS = AURORA_RING.laps;
+const TRACK_SAMPLES = 1400;
 const centerline = Array.from({ length: TRACK_SAMPLES }, (_, i) => trackCurve.getPointAt(i / TRACK_SAMPLES));
 
 function makeTrackRibbon(width: number, y: number, material: THREE.Material): THREE.Mesh {
@@ -61,7 +60,7 @@ function makeTrackRibbon(width: number, y: number, material: THREE.Material): TH
     const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
     const l = p.clone().addScaledVector(side, width / 2);
     const r = p.clone().addScaledVector(side, -width / 2);
-    positions.push(l.x, y, l.z, r.x, y, r.z);
+    positions.push(l.x, l.y + y, l.z, r.x, r.y + y, r.z);
     uvs.push(0, i / 12, 1, i / 12);
   }
   for (let i = 0; i < TRACK_SAMPLES; i++) {
@@ -98,7 +97,7 @@ function addTrackEnvironment() {
     gravel.rotation.x = -Math.PI / 2;
     gravel.rotation.z = -Math.atan2(tangent.x, tangent.z);
     gravel.position.copy(p).addScaledVector(side, zone.side * (TRACK_WIDTH / 2 + 15));
-    gravel.position.y = .055;
+    gravel.position.y = p.y + .055;
     gravel.receiveShadow = true;
     scene.add(gravel);
   }
@@ -122,7 +121,7 @@ function addTrackEnvironment() {
     const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
     const sign = i % 2 === 0 ? 1 : -1;
     dummy.position.copy(p).addScaledVector(side, sign * (TRACK_WIDTH / 2 + 13.5));
-    dummy.position.y = .58;
+    dummy.position.y = p.y + .58;
     dummy.rotation.set(0, Math.atan2(tangent.x, tangent.z), 0);
     dummy.updateMatrix();
     barriers.setMatrixAt(i, dummy.matrix);
@@ -136,7 +135,7 @@ function addTrackEnvironment() {
     const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
     const sign = i % 2 === 0 ? 1 : -1;
     dummy.position.copy(p).addScaledVector(side, sign * (TRACK_WIDTH / 2 + 28 + (i % 5) * 3));
-    dummy.position.y = 3.75;
+    dummy.position.y = p.y + 3.75;
     dummy.rotation.set(0, i * .73, 0);
     dummy.scale.setScalar(.75 + (i % 4) * .08);
     dummy.updateMatrix();
@@ -157,7 +156,7 @@ function addTrackEnvironment() {
     const tangent = trackCurve.getTangentAt(t).normalize();
     const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
     const blend = Math.sin((i / 28) * Math.PI);
-    pitPts.push(p.clone().addScaledVector(side, -blend * 19).setY(.12));
+    pitPts.push(p.clone().addScaledVector(side, -blend * 19).add(new THREE.Vector3(0, .12, 0)));
   }
   const pitCurve = new THREE.CatmullRomCurve3(pitPts, false, 'centripetal');
   const pitSamples = 140;
@@ -170,7 +169,7 @@ function addTrackEnvironment() {
     const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
     const l = p.clone().addScaledVector(side, 3.2);
     const r = p.clone().addScaledVector(side, -3.2);
-    pos.push(l.x,.125,l.z,r.x,.125,r.z);
+    pos.push(l.x,l.y+.005,l.z,r.x,r.y+.005,r.z);
   }
   for (let i=0;i<pitSamples;i++) {
     const a=i*2; idx.push(a,a+2,a+1,a+1,a+2,a+3);
@@ -221,7 +220,7 @@ function addCornerKerbs() {
     const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
     dummy.position.copy(p).addScaledVector(side, k.sideSign * (TRACK_WIDTH / 2 + 0.58));
-    dummy.position.y = 0.22;
+    dummy.position.y = p.y + 0.22;
     dummy.rotation.set(0, Math.atan2(tangent.x, tangent.z), 0);
     dummy.updateMatrix();
 
@@ -244,7 +243,7 @@ const startAngle = Math.atan2(startT.x, startT.z);
 const startLine = new THREE.Mesh(new THREE.PlaneGeometry(TRACK_WIDTH, 2.8), new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide }));
 startLine.rotation.x = -Math.PI / 2;
 startLine.rotation.z = -startAngle;
-startLine.position.copy(startP).setY(0.17);
+startLine.position.copy(startP).add(new THREE.Vector3(0, 0.17, 0));
 scene.add(startLine);
 
 // Sparse trackside posts for speed/depth cues.
@@ -259,7 +258,7 @@ for (let i = 0; i < 130; i++) {
   const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
   const sign = i % 2 ? 1 : -1;
   dummy.position.copy(p).addScaledVector(side, sign * (TRACK_WIDTH / 2 + 4.8));
-  dummy.position.y = 1.05;
+  dummy.position.y = p.y + 1.05;
   dummy.rotation.y = Math.atan2(tangent.x, tangent.z);
   dummy.updateMatrix();
   posts.setMatrixAt(i, dummy.matrix);
@@ -297,6 +296,25 @@ function createFormulaCar(bodyColor: number): THREE.Group {
   rearWing.position.set(0, 1.28, 2.4);
   car.add(rearWing);
 
+  const rearEndplateGeo = new THREE.BoxGeometry(.10, .78, .72);
+  const rearEndL = new THREE.Mesh(rearEndplateGeo, carbon);
+  rearEndL.position.set(-1.08, 1.02, 2.38);
+  const rearEndR = rearEndL.clone();
+  rearEndR.position.x = 1.08;
+  car.add(rearEndL, rearEndR);
+
+  const frontEndplateGeo = new THREE.BoxGeometry(.10, .46, .78);
+  const frontEndL = new THREE.Mesh(frontEndplateGeo, carbon);
+  frontEndL.position.set(-1.58, .48, -2.62);
+  const frontEndR = frontEndL.clone();
+  frontEndR.position.x = 1.58;
+  car.add(frontEndL, frontEndR);
+
+  const diffuser = new THREE.Mesh(new THREE.BoxGeometry(1.62, .22, .82), carbon);
+  diffuser.position.set(0, .30, 2.18);
+  diffuser.rotation.x = -.12;
+  car.add(diffuser);
+
   const sidePodL = new THREE.Mesh(new THREE.BoxGeometry(.62, .48, 1.75), bodyMat);
   sidePodL.position.set(-.77,.64,.62);
   const sidePodR = sidePodL.clone();
@@ -309,16 +327,65 @@ function createFormulaCar(bodyColor: number): THREE.Group {
   haloStem.position.set(0,1.17,-.15);
   car.add(haloBar, haloStem);
 
-  const wheelGeo = new THREE.CylinderGeometry(.43, .43, .34, 20);
+  const helmet = new THREE.Mesh(
+    new THREE.SphereGeometry(.28, 18, 12),
+    new THREE.MeshStandardMaterial({ color: 0xf3f4f6, metalness: .1, roughness: .28 }),
+  );
+  helmet.position.set(0, 1.25, .18);
+  car.add(helmet);
+
+  const visor = new THREE.Mesh(
+    new THREE.BoxGeometry(.37, .10, .16),
+    new THREE.MeshStandardMaterial({ color: 0x111820, metalness: .45, roughness: .18 }),
+  );
+  visor.position.set(0, 1.28, -.06);
+  visor.rotation.x = -.16;
+  car.add(visor);
+
+  const suspensionMat = new THREE.MeshStandardMaterial({ color: 0x1a1c20, metalness: .55, roughness: .35 });
+  const suspensionGeo = new THREE.BoxGeometry(.06, .06, 1.12);
+  const suspensionPoints = [
+    [-.72, .56, -1.05, -1.02, .48, -1.66],
+    [.72, .56, -1.05, 1.02, .48, -1.66],
+    [-.68, .56, 1.10, -1.00, .48, 1.54],
+    [.68, .56, 1.10, 1.00, .48, 1.54],
+  ] as const;
+  for (const [x1,y1,z1,x2,y2,z2] of suspensionPoints) {
+    const bar = new THREE.Mesh(suspensionGeo, suspensionMat);
+    const a = new THREE.Vector3(x1,y1,z1);
+    const b = new THREE.Vector3(x2,y2,z2);
+    const mid = a.clone().add(b).multiplyScalar(.5);
+    bar.position.copy(mid);
+    bar.scale.z = a.distanceTo(b) / 1.12;
+    bar.lookAt(b);
+    car.add(bar);
+  }
+
+  const wheelGeo = new THREE.CylinderGeometry(.43, .43, .34, 24);
   wheelGeo.rotateZ(Math.PI / 2);
   const wheelLocs = [
     [-1.05, .45, -1.72], [1.05, .45, -1.72], [-1.02, .45, 1.58], [1.02, .45, 1.58]
   ];
+  const rimGeo = new THREE.CylinderGeometry(.24, .24, .36, 18);
+  rimGeo.rotateZ(Math.PI / 2);
+  const rimMat = new THREE.MeshStandardMaterial({ color: 0x2d3036, metalness: .8, roughness: .28 });
+  const brakeGeo = new THREE.CylinderGeometry(.17, .17, .365, 18);
+  brakeGeo.rotateZ(Math.PI / 2);
+  const brakeMat = new THREE.MeshStandardMaterial({ color: 0x6b6b6b, metalness: .6, roughness: .5 });
+
   for (const [x, y, z] of wheelLocs) {
     const w = new THREE.Mesh(wheelGeo, tyre);
     w.position.set(x, y, z);
     w.castShadow = true;
     car.add(w);
+
+    const rim = new THREE.Mesh(rimGeo, rimMat);
+    rim.position.set(x, y, z);
+    car.add(rim);
+
+    const disc = new THREE.Mesh(brakeGeo, brakeMat);
+    disc.position.set(x, y, z);
+    car.add(disc);
   }
 
   car.traverse(obj => {
@@ -401,7 +468,7 @@ document.querySelector<HTMLButtonElement>('#mobile-drs')?.addEventListener('poin
 function resetPlayer(keepRace = false) {
   const p = trackCurve.getPointAt(0.002);
   const tangent = trackCurve.getTangentAt(0.002).normalize();
-  player.position.copy(p);
+  player.position.copy(p).add(new THREE.Vector3(0, .22, 0));
   player.heading = Math.atan2(tangent.x, tangent.z);
   player.speed = 0;
   player.steer = 0;
@@ -491,7 +558,9 @@ function updatePlayer(dt: number, raceTime: number) {
 
   const ahead = closestCarAhead();
   player.slipstream = THREE.MathUtils.clamp((.04 - ahead.gap) / .03, 0, 1);
-  const drsZone = (player.progress > .06 && player.progress < .20) || (player.progress > .56 && player.progress < .70);
+  const drsZone = AURORA_RING.drsZones.some(zone =>
+    player.progress >= zone.activationStart && player.progress <= zone.activationEnd
+  );
   player.drsReady = drsZone && player.lap >= 2 && ahead.gap < .035;
   if (!player.drsReady || player.brake > .08) player.drs = false;
 
@@ -528,7 +597,7 @@ function updatePlayer(dt: number, raceTime: number) {
 
   const forward = new THREE.Vector3(Math.sin(player.heading), 0, Math.cos(player.heading));
   player.position.addScaledVector(forward, player.speed * dt);
-  player.position.y = .22;
+  player.position.y = trackCurve.getPointAt(player.progress).y + .22;
   player.car.position.copy(player.position);
   player.car.rotation.set(0, player.heading, 0);
 
@@ -546,9 +615,10 @@ function updatePlayer(dt: number, raceTime: number) {
     player.lap += 1;
     player.lapStartedAt = raceTime;
     showMessage(`LAP ${player.lap - 1} · ${formatTime(lapTime)}`);
-    if (player.lap > 5) {
+    if (player.lap > RACE_LAPS) {
       finished = true;
-      showMessage(`FINISH · BEST ${formatTime(player.bestLap)}`, 9000);
+      showMessage(`CHEQUERED FLAG · BEST ${formatTime(player.bestLap)}`, 5000);
+      window.setTimeout(showFinalClassification, 900);
     }
   }
 }
@@ -572,7 +642,8 @@ function updateAI(dt: number, racing: boolean) {
     const tangent = trackCurve.getTangentAt(ai.progress).normalize();
     const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
     p.addScaledVector(side, ai.lane);
-    ai.car.position.copy(p).setY(.22);
+    p.y += .22;
+    ai.car.position.copy(p);
     ai.car.rotation.y = Math.atan2(tangent.x, tangent.z);
   }
 }
@@ -689,7 +760,7 @@ function drawMinimap() {
 
 function updateHUD(raceTime: number, now: number) {
   els.position.textContent = `P${computePosition()}`;
-  els.lap.textContent = `LAP ${Math.min(player.lap, 5)}/5`;
+  els.lap.textContent = `LAP ${Math.min(player.lap, RACE_LAPS)}/${RACE_LAPS}`;
   els.lapTime.textContent = formatTime(Math.max(0, raceTime - player.lapStartedAt));
   els.best.textContent = formatTime(player.bestLap);
   els.speed.textContent = String(Math.round(player.speed * 3.6));
@@ -726,6 +797,39 @@ function showMessage(text: string, duration = 2600) {
   els.message.classList.add('show');
   clearTimeout(messageTimeout);
   messageTimeout = window.setTimeout(() => els.message.classList.remove('show'), duration);
+}
+
+function showFinalClassification() {
+  const overlay = document.querySelector<HTMLElement>('#finish-overlay');
+  const body = document.querySelector<HTMLElement>('#results-body');
+  const resultTitle = document.querySelector<HTMLElement>('#finish-title');
+  if (!overlay || !body || !resultTitle) return;
+
+  const entries = [
+    {
+      name: 'YOU · DVILR GP',
+      score: (player.lap - 1) + player.progress,
+      best: player.bestLap,
+    },
+    ...aiCars.map((ai, i) => ({
+      name: `RIVAL ${String(i + 1).padStart(2, '0')}`,
+      score: ai.lap + ai.progress,
+      best: Number.POSITIVE_INFINITY,
+    })),
+  ].sort((a, b) => b.score - a.score);
+
+  body.innerHTML = entries.map((entry, index) =>
+    `<div class="result-row ${entry.name.startsWith('YOU') ? 'player-result' : ''}">
+      <b>P${index + 1}</b>
+      <span>${entry.name}</span>
+      <em>${Number.isFinite(entry.best) ? formatTime(entry.best) : 'CLASSIFIED'}</em>
+    </div>`
+  ).join('');
+
+  const pos = entries.findIndex(entry => entry.name.startsWith('YOU')) + 1;
+  resultTitle.textContent = `P${pos} · RACE COMPLETE`;
+  overlay.classList.add('active');
+  els.mobile.classList.add('hidden');
 }
 
 function togglePause() {
