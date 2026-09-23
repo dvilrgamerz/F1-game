@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import './styles.css';
 import { ARDENNE_GP } from './v3/track/ardenneGP';
-import { PitStopSystem } from './v3/race/PitStopSystem';
+import { PitStopSystem, type PitPhase } from './v3/race/PitStopSystem';
 import type { TireCompoundId } from './v3/types';
 
 type CameraMode = 'chase' | 'cockpit' | 'broadcast';
@@ -632,7 +632,8 @@ function updatePitLane(dt: number, raceTime: number): boolean {
       pitExitProgress: ARDENNE_GP.pitExit,
       pitSpeedLimitMps: ARDENNE_GP.pitSpeedLimitMps,
     });
-    if (pitStop.state.phase === 'ENTRY') {
+    const phaseAfterEntryCheck = pitStop.state.phase as PitPhase;
+    if (phaseAfterEntryCheck === 'ENTRY') {
       pitLaneProgress = 0;
       showMessage('PIT LANE · LIMITER', 2600);
     } else {
@@ -698,7 +699,8 @@ function updatePitLane(dt: number, raceTime: number): boolean {
     pitPenaltySeconds = Math.max(pitPenaltySeconds, 5);
   }
 
-  if (oldPhase === 'SERVICE' && pitStop.state.phase !== 'SERVICE') {
+  const phaseAfterStep = pitStop.state.phase as PitPhase;
+  if (oldPhase === 'SERVICE' && phaseAfterStep !== 'SERVICE') {
     player.compound = pitStop.state.compound;
     player.tyre = 1;
     player.tyreTemp = player.compound === 'SOFT' ? 88 : player.compound === 'HARD' ? 80 : 84;
@@ -706,7 +708,7 @@ function updatePitLane(dt: number, raceTime: number): boolean {
     showMessage(`PIT STOP COMPLETE · ${player.compound}`, 3200);
   }
 
-  if (pitStop.state.phase === 'NONE') {
+  if (phaseAfterStep === 'NONE') {
     const exit = trackCurve.getPointAt(ARDENNE_GP.pitExit);
     const exitTangent = trackCurve.getTangentAt(ARDENNE_GP.pitExit).normalize();
     player.position.copy(exit).add(new THREE.Vector3(0, .22, 0));
