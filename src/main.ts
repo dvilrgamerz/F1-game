@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import './styles.css';
 
 type CameraMode = 'chase' | 'cockpit' | 'broadcast';
-type TouchAction = 'left' | 'right' | 'throttle' | 'brake';
+type TouchAction = 'left' | 'right' | 'throttle' | 'brake' | 'ers';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -78,8 +78,111 @@ function makeTrackRibbon(width: number, y: number, material: THREE.Material): TH
   return mesh;
 }
 
+scene.add(makeTrackRibbon(TRACK_WIDTH + 10.5, 0.045, new THREE.MeshStandardMaterial({ color: 0x2d8b57, roughness: 0.96 })));
 scene.add(makeTrackRibbon(TRACK_WIDTH + 3.2, 0.08, new THREE.MeshStandardMaterial({ color: 0xb7b7b0, roughness: 1 })));
-scene.add(makeTrackRibbon(TRACK_WIDTH, 0.14, new THREE.MeshStandardMaterial({ color: 0x2a2b2c, roughness: 0.86, metalness: 0.04 })));
+scene.add(makeTrackRibbon(TRACK_WIDTH, 0.14, new THREE.MeshStandardMaterial({ color: 0x292a2c, roughness: 0.86, metalness: 0.04 })));
+
+function addTrackEnvironment() {
+  const gravelMat = new THREE.MeshStandardMaterial({ color: 0xc8ad7f, roughness: 1 });
+  const gravelZones = [
+    { t: .27, side: 1, rx: 24, rz: 13 },
+    { t: .49, side: -1, rx: 26, rz: 15 },
+    { t: .77, side: 1, rx: 22, rz: 13 }
+  ];
+  for (const zone of gravelZones) {
+    const p = trackCurve.getPointAt(zone.t);
+    const tangent = trackCurve.getTangentAt(zone.t).normalize();
+    const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+    const gravel = new THREE.Mesh(new THREE.CircleGeometry(1, 48), gravelMat);
+    gravel.scale.set(zone.rx, zone.rz, 1);
+    gravel.rotation.x = -Math.PI / 2;
+    gravel.rotation.z = -Math.atan2(tangent.x, tangent.z);
+    gravel.position.copy(p).addScaledVector(side, zone.side * (TRACK_WIDTH / 2 + 15));
+    gravel.position.y = .055;
+    gravel.receiveShadow = true;
+    scene.add(gravel);
+  }
+
+  const barrierGeo = new THREE.BoxGeometry(3.2, 1.15, .34);
+  const barrierMat = new THREE.MeshStandardMaterial({ color: 0xd9dde2, metalness: .35, roughness: .55 });
+  const barrierCount = 320;
+  const barriers = new THREE.InstancedMesh(barrierGeo, barrierMat, barrierCount);
+  const markerGeo = new THREE.BoxGeometry(.18, 1.16, .37);
+  const markerMat = new THREE.MeshStandardMaterial({ color: 0xd71920, roughness: .7 });
+  const markers = new THREE.InstancedMesh(markerGeo, markerMat, barrierCount);
+  const treeGeo = new THREE.ConeGeometry(2.3, 7.5, 7);
+  const treeMat = new THREE.MeshStandardMaterial({ color: 0x245c31, roughness: 1 });
+  const trees = new THREE.InstancedMesh(treeGeo, treeMat, 110);
+  const dummy = new THREE.Object3D();
+
+  for (let i = 0; i < barrierCount; i++) {
+    const t = i / barrierCount;
+    const p = trackCurve.getPointAt(t);
+    const tangent = trackCurve.getTangentAt(t).normalize();
+    const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+    const sign = i % 2 === 0 ? 1 : -1;
+    dummy.position.copy(p).addScaledVector(side, sign * (TRACK_WIDTH / 2 + 13.5));
+    dummy.position.y = .58;
+    dummy.rotation.set(0, Math.atan2(tangent.x, tangent.z), 0);
+    dummy.updateMatrix();
+    barriers.setMatrixAt(i, dummy.matrix);
+    markers.setMatrixAt(i, dummy.matrix);
+  }
+
+  for (let i = 0; i < 110; i++) {
+    const t = (i * .037 + .013) % 1;
+    const p = trackCurve.getPointAt(t);
+    const tangent = trackCurve.getTangentAt(t).normalize();
+    const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+    const sign = i % 2 === 0 ? 1 : -1;
+    dummy.position.copy(p).addScaledVector(side, sign * (TRACK_WIDTH / 2 + 28 + (i % 5) * 3));
+    dummy.position.y = 3.75;
+    dummy.rotation.set(0, i * .73, 0);
+    dummy.scale.setScalar(.75 + (i % 4) * .08);
+    dummy.updateMatrix();
+    trees.setMatrixAt(i, dummy.matrix);
+  }
+
+  barriers.castShadow = true;
+  markers.castShadow = true;
+  trees.castShadow = true;
+  scene.add(barriers, markers, trees);
+
+  // Visual pit lane running parallel to the main straight.
+  const pitPts: THREE.Vector3[] = [];
+  for (let i = 0; i <= 28; i++) {
+    const raw = .88 + (i / 28) * .18;
+    const t = raw % 1;
+    const p = trackCurve.getPointAt(t);
+    const tangent = trackCurve.getTangentAt(t).normalize();
+    const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+    const blend = Math.sin((i / 28) * Math.PI);
+    pitPts.push(p.clone().addScaledVector(side, -blend * 19).setY(.12));
+  }
+  const pitCurve = new THREE.CatmullRomCurve3(pitPts, false, 'centripetal');
+  const pitSamples = 140;
+  const pos: number[] = [];
+  const idx: number[] = [];
+  for (let i = 0; i <= pitSamples; i++) {
+    const t = i / pitSamples;
+    const p = pitCurve.getPointAt(t);
+    const tangent = pitCurve.getTangentAt(Math.min(t, .999)).normalize();
+    const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+    const l = p.clone().addScaledVector(side, 3.2);
+    const r = p.clone().addScaledVector(side, -3.2);
+    pos.push(l.x,.125,l.z,r.x,.125,r.z);
+  }
+  for (let i=0;i<pitSamples;i++) {
+    const a=i*2; idx.push(a,a+2,a+1,a+1,a+2,a+3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  g.setIndex(idx); g.computeVertexNormals();
+  const pit = new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x37383b,roughness:.9}));
+  pit.receiveShadow=true;
+  scene.add(pit);
+}
+addTrackEnvironment();
 
 // Formula-style kerbs: place red/white raised strips on the inside of meaningful bends.
 function addCornerKerbs() {
@@ -194,6 +297,18 @@ function createFormulaCar(bodyColor: number): THREE.Group {
   rearWing.position.set(0, 1.28, 2.4);
   car.add(rearWing);
 
+  const sidePodL = new THREE.Mesh(new THREE.BoxGeometry(.62, .48, 1.75), bodyMat);
+  sidePodL.position.set(-.77,.64,.62);
+  const sidePodR = sidePodL.clone();
+  sidePodR.position.x = .77;
+  car.add(sidePodL, sidePodR);
+
+  const haloBar = new THREE.Mesh(new THREE.BoxGeometry(1.05,.09,.09), carbon);
+  haloBar.position.set(0,1.42,.12);
+  const haloStem = new THREE.Mesh(new THREE.BoxGeometry(.09,.52,.09), carbon);
+  haloStem.position.set(0,1.17,-.15);
+  car.add(haloBar, haloStem);
+
   const wheelGeo = new THREE.CylinderGeometry(.43, .43, .34, 20);
   wheelGeo.rotateZ(Math.PI / 2);
   const wheelLocs = [
@@ -233,9 +348,13 @@ const player = {
   bestLap: Number.POSITIVE_INFINITY,
   ers: 1,
   tyre: 1,
+  tyreTemp: 90,
   drs: false,
+  drsReady: false,
   ersDeploy: false,
+  slipstream: 0,
   onKerb: false,
+  surface: 'TRACK',
   offTrack: false
 };
 scene.add(player.car);
@@ -261,7 +380,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyC') cameraMode = cameraMode === 'chase' ? 'cockpit' : cameraMode === 'cockpit' ? 'broadcast' : 'chase';
   if (e.code === 'KeyR') resetPlayer(true);
   if (e.code === 'Escape' && raceStarted) togglePause();
-  if (e.code === 'KeyE') player.drs = !player.drs;
+  if (e.code === 'KeyE' && player.drsReady) player.drs = !player.drs;
 });
 addEventListener('keyup', e => keys.delete(e.code));
 
@@ -274,6 +393,10 @@ for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-touch]')) 
   btn.addEventListener('pointercancel', off);
   btn.addEventListener('pointerleave', off);
 }
+document.querySelector<HTMLButtonElement>('#mobile-drs')?.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (player.drsReady) player.drs = !player.drs;
+});
 
 function resetPlayer(keepRace = false) {
   const p = trackCurve.getPointAt(0.002);
@@ -290,6 +413,7 @@ function resetPlayer(keepRace = false) {
     player.lap = 1;
     player.ers = 1;
     player.tyre = 1;
+    player.tyreTemp = 90;
     player.bestLap = Number.POSITIVE_INFINITY;
   }
 }
@@ -318,6 +442,36 @@ function nearestTrackProgress(pos: THREE.Vector3): { progress: number; distance:
   return { progress: bestI / TRACK_SAMPLES, distance: Math.sqrt(best) };
 }
 
+function wrappedProgressGap(a: number, b: number) {
+  let gap = b - a;
+  if (gap < 0) gap += 1;
+  return gap;
+}
+
+function closestCarAhead() {
+  let bestGap = 1;
+  let bestLane = 99;
+  for (const ai of aiCars) {
+    const lapDelta = ai.lap - (player.lap - 1);
+    if (lapDelta < 0 || lapDelta > 1) continue;
+    const gap = lapDelta === 0 ? wrappedProgressGap(player.progress, ai.progress) : 1 - player.progress + ai.progress;
+    if (gap > 0 && gap < bestGap) {
+      bestGap = gap;
+      bestLane = Math.abs(ai.lane);
+    }
+  }
+  return { gap: bestGap, lane: bestLane };
+}
+
+function isGravelTrap(progress: number, distance: number) {
+  if (distance < TRACK_WIDTH / 2 + 7) return false;
+  const zones = [.27,.49,.77];
+  return zones.some(z => {
+    const d = Math.min(Math.abs(progress-z), 1-Math.abs(progress-z));
+    return d < .045;
+  });
+}
+
 function updatePlayer(dt: number, raceTime: number) {
   const throttleTarget = (keys.has('KeyW') || keys.has('ArrowUp') || touch.has('throttle')) ? 1 : 0;
   const brakeTarget = (keys.has('KeyS') || keys.has('ArrowDown') || touch.has('brake')) ? 1 : 0;
@@ -325,32 +479,42 @@ function updatePlayer(dt: number, raceTime: number) {
   player.throttle = THREE.MathUtils.lerp(player.throttle, throttleTarget, 1 - Math.exp(-dt * 8));
   player.brake = THREE.MathUtils.lerp(player.brake, brakeTarget, 1 - Math.exp(-dt * 12));
   player.steer = THREE.MathUtils.lerp(player.steer, steerTarget, 1 - Math.exp(-dt * 7));
-  player.ersDeploy = keys.has('Space') && player.ers > .005;
+  player.ersDeploy = (keys.has('Space') || touch.has('ers')) && player.ers > .005;
 
   const trackInfo = nearestTrackProgress(player.position);
   player.previousProgress = player.progress;
   player.progress = trackInfo.progress;
-  player.onKerb = trackInfo.distance > TRACK_WIDTH * .47 && trackInfo.distance <= TRACK_WIDTH * .57;
-  player.offTrack = trackInfo.distance > TRACK_WIDTH * .57;
+  const gravel = isGravelTrap(player.progress, trackInfo.distance);
+  player.onKerb = trackInfo.distance > TRACK_WIDTH * .47 && trackInfo.distance <= TRACK_WIDTH * .59;
+  player.offTrack = trackInfo.distance > TRACK_WIDTH * .59;
+  player.surface = gravel ? 'GRAVEL' : player.offTrack ? 'RUNOFF' : player.onKerb ? 'KERB' : 'TRACK';
 
-  const drsZone = player.progress > .06 && player.progress < .20;
-  if (!drsZone) player.drs = false;
+  const ahead = closestCarAhead();
+  player.slipstream = THREE.MathUtils.clamp((.04 - ahead.gap) / .03, 0, 1);
+  const drsZone = (player.progress > .06 && player.progress < .20) || (player.progress > .56 && player.progress < .70);
+  player.drsReady = drsZone && player.lap >= 2 && ahead.gap < .035;
+  if (!player.drsReady || player.brake > .08) player.drs = false;
 
-  const maxSpeed = player.drs && drsZone ? 101 : 95;
-  const engineAccel = 24 * player.throttle * (1 - Math.min(player.speed / maxSpeed, .98));
-  const ersAccel = player.ersDeploy ? 6.5 : 0;
-  const drag = .0039 * player.speed * player.speed;
-  const rolling = player.offTrack ? 5.8 : player.onKerb ? 1.2 : .55;
-  const braking = 35 * player.brake;
+  const maxSpeed = player.drs && player.drsReady ? 104 : 97;
+  const engineAccel = 25.5 * Math.pow(player.throttle, 1.12) * (1 - Math.min(player.speed / maxSpeed, .985));
+  const ersAccel = player.ersDeploy ? 7.2 : 0;
+  const draftDragScale = 1 - player.slipstream * .22;
+  const drag = .00385 * player.speed * player.speed * draftDragScale;
+  const rolling = gravel ? 10.5 : player.offTrack ? 5.6 : player.onKerb ? 1.25 : .52;
+  const braking = 37.5 * player.brake;
   player.speed += (engineAccel + ersAccel - drag - rolling - braking) * dt;
   player.speed = THREE.MathUtils.clamp(player.speed, 0, maxSpeed);
 
   if (player.ersDeploy) player.ers = Math.max(0, player.ers - dt * .085);
   else player.ers = Math.min(1, player.ers + dt * (player.throttle < .3 ? .038 : .012));
 
-  const steeringLimit = THREE.MathUtils.lerp(.58, .12, THREE.MathUtils.clamp(player.speed / 95, 0, 1));
-  const grip = player.offTrack ? .52 : player.onKerb ? .86 : THREE.MathUtils.lerp(.94, .82, 1 - player.tyre);
-  const yawRate = player.steer * steeringLimit * grip * (player.speed / 13) / (1 + player.speed / 36);
+  const steeringLimit = THREE.MathUtils.lerp(.61, .115, THREE.MathUtils.clamp(player.speed / 100, 0, 1));
+  const tempGrip = THREE.MathUtils.clamp(1 - Math.abs(player.tyreTemp - 96) / 90, .72, 1);
+  const wearGrip = THREE.MathUtils.lerp(.78, 1, player.tyre);
+  const surfaceGrip = gravel ? .32 : player.offTrack ? .5 : player.onKerb ? .84 : 1;
+  const grip = tempGrip * wearGrip * surfaceGrip;
+  const aeroGrip = THREE.MathUtils.lerp(.78, 1.18, THREE.MathUtils.clamp(player.speed / 92,0,1));
+  const yawRate = player.steer * steeringLimit * grip * aeroGrip * (player.speed / 13) / (1 + player.speed / 36);
   player.heading += yawRate * dt;
 
   // Mild stability: car aligns toward track direction when on-track, preserving player control.
@@ -368,8 +532,12 @@ function updatePlayer(dt: number, raceTime: number) {
   player.car.position.copy(player.position);
   player.car.rotation.set(0, player.heading, 0);
 
-  const wearRate = (Math.abs(player.steer) * .000055 + player.brake * .000035 + player.throttle * .000012) * (1 + player.speed / 80);
-  player.tyre = Math.max(.58, player.tyre - wearRate * dt * 60);
+  const heatIn = Math.abs(player.steer) * player.speed * .014 + player.brake * 5.8 + player.throttle * 1.3;
+  const cooling = (player.tyreTemp - 82) * (.035 + player.speed * .00042);
+  player.tyreTemp = THREE.MathUtils.clamp(player.tyreTemp + (heatIn - cooling) * dt, 65, 130);
+  const heatWear = 1 + Math.max(0, player.tyreTemp - 103) * .025;
+  const wearRate = (Math.abs(player.steer) * .00005 + player.brake * .000032 + player.throttle * .000011) * (1 + player.speed / 85) * heatWear;
+  player.tyre = Math.max(.52, player.tyre - wearRate * dt * 60);
 
   // Start/finish wrap detection.
   if (player.previousProgress > .88 && player.progress < .12 && player.speed > 8 && raceTime - player.lapStartedAt > 15) {
@@ -389,9 +557,13 @@ function updateAI(dt: number, racing: boolean) {
   for (let i = 0; i < aiCars.length; i++) {
     const ai = aiCars[i];
     if (racing && !finished) {
-      const curvatureNoise = Math.sin(ai.progress * Math.PI * 14 + i) * 5;
-      const target = ai.baseSpeed - Math.abs(curvatureNoise) + Math.sin(performance.now() * .0005 + i) * 2.5;
-      ai.speed = THREE.MathUtils.lerp(ai.speed, target, dt * .8);
+      const ta = trackCurve.getTangentAt((ai.progress + .998) % 1).normalize();
+      const tb = trackCurve.getTangentAt((ai.progress + .002) % 1).normalize();
+      const cornerLoad = THREE.MathUtils.clamp(ta.angleTo(tb) * 160, 0, 28);
+      const racingVariation = Math.sin(performance.now() * .00045 + i * 1.7) * 1.8;
+      const target = ai.baseSpeed - cornerLoad + racingVariation;
+      ai.speed = THREE.MathUtils.lerp(ai.speed, target, dt * 1.15);
+      ai.lane = THREE.MathUtils.lerp(ai.lane, Math.sin(ai.progress * Math.PI * 10 + i * .8) * 1.65, dt * .55);
       const old = ai.progress;
       ai.progress = (ai.progress + (ai.speed * dt) / 1900) % 1;
       if (old > .95 && ai.progress < .05) ai.lap++;
@@ -456,10 +628,16 @@ const els = {
   tyre: document.querySelector<HTMLElement>('#tyre-bar')!,
   ersText: document.querySelector<HTMLElement>('#ers-text')!,
   tyreText: document.querySelector<HTMLElement>('#tyre-text')!,
+  temp: document.querySelector<HTMLElement>('#temp-bar')!,
+  tempText: document.querySelector<HTMLElement>('#temp-text')!,
   drs: document.querySelector<HTMLElement>('#drs-indicator')!,
   ersInd: document.querySelector<HTMLElement>('#ers-indicator')!,
+  draft: document.querySelector<HTMLElement>('#draft-indicator')!,
+  surface: document.querySelector<HTMLElement>('#surface-indicator')!,
+  lights: document.querySelector<HTMLElement>('#start-lights')!,
   countdown: document.querySelector<HTMLElement>('#countdown')!,
   message: document.querySelector<HTMLElement>('#message')!,
+  minimap: document.querySelector<HTMLCanvasElement>('#minimap')!,
 };
 
 function gearForSpeed(ms: number): string {
@@ -483,6 +661,32 @@ function formatTime(seconds: number) {
   return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}.${String(ms).padStart(3, '0')}`;
 }
 
+const minimapCtx = els.minimap.getContext('2d');
+function drawMinimap() {
+  if (!minimapCtx) return;
+  const w = els.minimap.width, h = els.minimap.height;
+  minimapCtx.clearRect(0,0,w,h);
+  minimapCtx.strokeStyle = 'rgba(255,255,255,.42)';
+  minimapCtx.lineWidth = 5;
+  minimapCtx.lineCap = 'round';
+  minimapCtx.beginPath();
+  const xs = centerline.map(p=>p.x), zs = centerline.map(p=>p.z);
+  const minX=Math.min(...xs), maxX=Math.max(...xs), minZ=Math.min(...zs), maxZ=Math.max(...zs);
+  const project=(p:THREE.Vector3)=>({
+    x: 12+(p.x-minX)/(maxX-minX)*(w-24),
+    y: 10+(p.z-minZ)/(maxZ-minZ)*(h-20)
+  });
+  centerline.forEach((p,i)=>{ const q=project(p); if(i===0) minimapCtx.moveTo(q.x,q.y); else minimapCtx.lineTo(q.x,q.y); });
+  minimapCtx.closePath(); minimapCtx.stroke();
+
+  const pp=project(player.position);
+  minimapCtx.fillStyle='#ff314f'; minimapCtx.beginPath(); minimapCtx.arc(pp.x,pp.y,5,0,Math.PI*2); minimapCtx.fill();
+  minimapCtx.fillStyle='rgba(255,255,255,.75)';
+  for(let i=0;i<aiCars.length;i+=3){
+    const q=project(aiCars[i].car.position); minimapCtx.beginPath(); minimapCtx.arc(q.x,q.y,2.3,0,Math.PI*2); minimapCtx.fill();
+  }
+}
+
 function updateHUD(raceTime: number, now: number) {
   els.position.textContent = `P${computePosition()}`;
   els.lap.textContent = `LAP ${Math.min(player.lap, 5)}/5`;
@@ -494,20 +698,26 @@ function updateHUD(raceTime: number, now: number) {
   els.brake.style.width = `${player.brake * 100}%`;
   els.ers.style.width = `${player.ers * 100}%`;
   els.tyre.style.width = `${player.tyre * 100}%`;
+  els.temp.style.width = `${THREE.MathUtils.clamp((player.tyreTemp-65)/65,0,1)*100}%`;
   els.ersText.textContent = `${Math.round(player.ers * 100)}%`;
   els.tyreText.textContent = `${Math.round(player.tyre * 100)}%`;
-  const drsZone = player.progress > .06 && player.progress < .20;
-  els.drs.classList.toggle('active', player.drs && drsZone);
+  els.tempText.textContent = `${Math.round(player.tyreTemp)}°C`;
+  els.drs.classList.toggle('ready', player.drsReady);
+  els.drs.classList.toggle('active', player.drs);
   els.ersInd.classList.toggle('active', player.ersDeploy);
-  els.status.textContent = finished ? 'CHEQUERED FLAG' : player.offTrack ? 'OFF TRACK' : player.onKerb ? 'KERB' : cameraMode.toUpperCase();
+  els.draft.classList.toggle('active', player.slipstream > .25);
+  els.surface.textContent = player.surface;
+  els.surface.classList.toggle('warning', player.surface !== 'TRACK');
+  els.status.textContent = finished ? 'CHEQUERED FLAG' : player.drsReady ? 'DRS AVAILABLE' : player.slipstream > .35 ? 'SLIPSTREAM' : player.surface !== 'TRACK' ? player.surface : cameraMode.toUpperCase();
+  drawMinimap();
 
   if (!raceStarted) return;
   const elapsed = (now - raceStartAt) / 1000;
-  if (elapsed < 1) els.countdown.textContent = '3';
-  else if (elapsed < 2) els.countdown.textContent = '2';
-  else if (elapsed < 3) els.countdown.textContent = '1';
-  else if (elapsed < 3.7) els.countdown.textContent = 'GO';
-  else els.countdown.textContent = '';
+  const lights = Array.from(els.lights.querySelectorAll('i'));
+  els.lights.classList.toggle('show', elapsed < 5.9);
+  els.lights.classList.toggle('go', elapsed >= 5);
+  lights.forEach((light,i)=>light.classList.toggle('on', elapsed >= i+.65 && elapsed < 5));
+  els.countdown.textContent = elapsed >= 5 && elapsed < 5.7 ? 'GO' : '';
 }
 
 let messageTimeout = 0;
@@ -554,7 +764,7 @@ function loop(now: number) {
   if (!paused) {
     accumulator += rawDt;
     while (accumulator >= FIXED) {
-      const countdownDone = raceStarted && (now - raceStartAt) / 1000 >= 3.1;
+      const countdownDone = raceStarted && (now - raceStartAt) / 1000 >= 5;
       if (raceStarted && countdownDone && !finished) {
         simTime += FIXED;
         updatePlayer(FIXED, simTime);
