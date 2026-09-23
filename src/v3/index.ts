@@ -7,3 +7,5 @@ export * from './physics/RapierWorld';
 export * from './physics/TireModel';
 export * from './race/RaceDirector';
 export * from './track/auroraRing';
+export * from './physics/Suspension';
+export * from './physics/VehicleDynamics';
