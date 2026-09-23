@@ -107,3 +107,41 @@ button { font: inherit; }
   .mobile-controls button { width: 62px; height: 62px; }
   .mobile-right button { width: 78px; }
 }
+
+
+/* V3 race classification */
+.results-panel {
+  width: min(720px, 94vw);
+  max-height: 86vh;
+  overflow: hidden;
+}
+.results-panel h2 {
+  font-size: clamp(36px, 8vw, 70px);
+  margin: 10px 0 18px;
+  letter-spacing: -.04em;
+}
+.results-body {
+  display: grid;
+  gap: 5px;
+  max-height: 52vh;
+  overflow: auto;
+  margin: 0 0 18px;
+  padding-right: 6px;
+}
+.result-row {
+  display: grid;
+  grid-template-columns: 54px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.045);
+  border: 1px solid rgba(255,255,255,.08);
+}
+.result-row b { font-size: 18px; }
+.result-row span { font-size: 13px; font-weight: 800; }
+.result-row em { font-size: 11px; opacity: .58; font-style: normal; }
+.result-row.player-result {
+  background: rgba(255,255,255,.13);
+  border-color: rgba(255,255,255,.3);
+}
