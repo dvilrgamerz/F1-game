@@ -9,3 +9,5 @@ export * from './race/RaceDirector';
 export * from './track/auroraRing';
 export * from './physics/Suspension';
 export * from './physics/VehicleDynamics';
+export * from './track/ardenneGP';
+export * from './race/PitStopSystem';
