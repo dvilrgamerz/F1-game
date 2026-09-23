@@ -4,15 +4,21 @@ DVILR GP is an original browser-based open-wheel racing project built with Three
 
 ## What is playable now
 
-The current main game still keeps the proven lightweight V2 driving loop so the project remains playable while the physical V3 systems are built underneath it.
+The live game still uses the lightweight V2-derived movement loop for the cars while V3 physical vehicle modules are being migrated in, but the V3 race systems are now connected to gameplay.
 
 Visible V3 upgrades already on main:
 
-- 10-lap original Grand Prix
+- 44-lap Grand Prix
 - 20-car field
-- New **Aurora International Circuit**
-- More complex circuit shape and elevation
-- Raised kerbs, runoff, gravel, barriers, vegetation and pit-lane visuals
+- New **Ardenne GP Circuit**, an original Spa-inspired venue
+- Heavy elevation and a longer high-speed layout
+- Raised kerbs, runoff, gravel, barriers, vegetation and a functional pit lane
+- **BOX THIS LAP** strategy command
+- Soft / Medium / Hard tyre selection
+- Automated pit-lane limiter/guide
+- Pit-box stop with service countdown
+- Tyre life and temperature reset after service
+- Pit-speeding penalty tracking
 - More detailed procedural Formula-style car with:
   - sidepods
   - halo
@@ -93,8 +99,10 @@ src/
       TireModel.ts
     race/
       RaceDirector.ts
+      PitStopSystem.ts
     track/
       auroraRing.ts
+      ardenneGP.ts
 ```
 
 ## Install and run
@@ -128,7 +136,7 @@ The correct order is:
 2. Tune braking, wheelspin, lockups, suspension and aero.
 3. Move all 19 AI cars onto the same physical vehicle model.
 4. Add real car-to-car/barrier collisions and damage.
-5. Add working pit lane/stops, compounds and fuel.
+5. Extend the now-working pit system with AI strategy, fuel and repairs.
 6. Add flags, penalties, VSC/safety car and track limits.
 7. Add weather/wet track/drying line.
 8. Add replay, gamepad/wheel support and multiplayer-ready snapshots.
