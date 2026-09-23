@@ -14,20 +14,20 @@
         <div class="panel hero-panel">
           <div class="eyebrow">DVILR GP · VERSION 3 ALPHA</div>
           <h1>DVILR GP</h1>
-          <p>A deeper browser Formula racing sim with an original 10-lap Grand Prix, elevated circuit, 20-car field, V3 physics architecture, DRS/ERS strategy and full race classification.</p>
+          <p>A full 44-lap Formula-style Grand Prix on the Spa-inspired Ardenne GP Circuit, with 20 cars, elevation, DRS/ERS strategy, tyre compounds, a functional pit stop and full race classification.</p>
           <div class="feature-row">
-            <span>10-lap GP</span><span>20 cars</span><span>Elevated circuit</span><span>V3 physics core</span><span>DRS + ERS</span><span>Full results</span>
+            <span>44-lap GP</span><span>20 cars</span><span>Ardenne GP</span><span>Real pit stop</span><span>Soft / Medium / Hard</span><span>DRS + ERS</span>
           </div>
           <button id="start-btn">START GRAND PRIX</button>
-          <div class="controls-copy">W/↑ throttle · S/↓ brake · A/D steer · Space ERS · E DRS · C camera · R reset · Esc pause</div>
-          <div class="version-note">V3 uses original branding, cars and circuit design. Rapier-based physical vehicle work now lives under src/v3.</div>
+          <div class="controls-copy">W/↑ throttle · S/↓ brake · A/D steer · Space ERS · E DRS · P box this lap · C camera · R reset · Esc pause</div>
+          <div class="version-note">V3 uses original branding and a Spa-inspired original circuit. The live race now includes a working pit lane, tyre service and compound strategy.</div>
         </div>
       </div>
 
 
       <div id="finish-overlay" class="screen">
         <div class="panel results-panel">
-          <div class="eyebrow">AURORA INTERNATIONAL CIRCUIT</div>
+          <div class="eyebrow">ARDENNE GP CIRCUIT</div>
           <h2 id="finish-title">RACE COMPLETE</h2>
           <div id="results-body" class="results-body"></div>
           <button onclick="location.reload()">RACE AGAIN</button>
@@ -44,7 +44,7 @@
 
       <div id="hud" class="hidden">
         <div class="topbar">
-          <div class="race-chip"><b id="position">P20</b><span id="lap">LAP 1/10</span></div>
+          <div class="race-chip"><b id="position">P20</b><span id="lap">LAP 1/44</span></div>
           <div class="race-chip center"><span id="race-status">FORMATION</span><b id="lap-time">00:00.000</b></div>
           <div class="race-chip right"><span>BEST</span><b id="best-time">--:--.---</b></div>
           <canvas id="minimap" width="180" height="120" aria-label="Circuit minimap"></canvas>
@@ -67,7 +67,24 @@
             <div id="ers-indicator" class="system-pill">OVERTAKE</div>
             <div id="draft-indicator" class="system-pill">SLIPSTREAM</div>
             <div id="surface-indicator" class="system-pill active">TRACK</div>
+            <div id="pit-indicator" class="system-pill">PIT</div>
           </div>
+        </div>
+
+        <div class="pit-panel">
+          <div class="pit-meta">
+            <span id="pit-status">STOPS 0</span>
+            <b id="compound-text">MEDIUM</b>
+          </div>
+          <label>
+            NEXT TYRE
+            <select id="pit-compound">
+              <option value="SOFT">SOFT</option>
+              <option value="MEDIUM" selected>MEDIUM</option>
+              <option value="HARD">HARD</option>
+            </select>
+          </label>
+          <button id="box-btn">BOX THIS LAP</button>
         </div>
 
         <div id="start-lights" class="start-lights" aria-label="Race start lights">
