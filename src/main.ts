@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import './styles.css';
-import { AURORA_RING } from './v3/track/auroraRing';
+import { ARDENNE_GP } from './v3/track/ardenneGP';
+import { PitStopSystem } from './v3/race/PitStopSystem';
+import type { TireCompoundId } from './v3/types';
 
 type CameraMode = 'chase' | 'cockpit' | 'broadcast';
 type TouchAction = 'left' | 'right' | 'throttle' | 'brake' | 'ers';
@@ -41,11 +43,11 @@ grass.rotation.x = -Math.PI / 2;
 grass.receiveShadow = true;
 scene.add(grass);
 
-const trackPoints = AURORA_RING.controlPoints.map(({ x, y, z }) => new THREE.Vector3(x, y, z));
+const trackPoints = ARDENNE_GP.controlPoints.map(({ x, y, z }) => new THREE.Vector3(x, y, z));
 
 const trackCurve = new THREE.CatmullRomCurve3(trackPoints, true, 'centripetal', 0.45);
-const TRACK_WIDTH = AURORA_RING.widthMeters;
-const RACE_LAPS = AURORA_RING.laps;
+const TRACK_WIDTH = ARDENNE_GP.widthMeters;
+const RACE_LAPS = ARDENNE_GP.laps;
 const TRACK_SAMPLES = 1400;
 const centerline = Array.from({ length: TRACK_SAMPLES }, (_, i) => trackCurve.getPointAt(i / TRACK_SAMPLES));
 
@@ -77,9 +79,15 @@ function makeTrackRibbon(width: number, y: number, material: THREE.Material): TH
   return mesh;
 }
 
+scene.add(makeTrackRibbon(TRACK_WIDTH + 74, -0.22, new THREE.MeshStandardMaterial({ color: 0x426f31, roughness: 1 })));
 scene.add(makeTrackRibbon(TRACK_WIDTH + 10.5, 0.045, new THREE.MeshStandardMaterial({ color: 0x2d8b57, roughness: 0.96 })));
 scene.add(makeTrackRibbon(TRACK_WIDTH + 3.2, 0.08, new THREE.MeshStandardMaterial({ color: 0xb7b7b0, roughness: 1 })));
 scene.add(makeTrackRibbon(TRACK_WIDTH, 0.14, new THREE.MeshStandardMaterial({ color: 0x292a2c, roughness: 0.86, metalness: 0.04 })));
+
+let pitCurve: THREE.CatmullRomCurve3 | null = null;
+let pitLaneLength = 1;
+let pitBoxPosition = new THREE.Vector3();
+const PIT_BOX_T = 0.56;
 
 function addTrackEnvironment() {
   const gravelMat = new THREE.MeshStandardMaterial({ color: 0xc8ad7f, roughness: 1 });
@@ -147,28 +155,34 @@ function addTrackEnvironment() {
   trees.castShadow = true;
   scene.add(barriers, markers, trees);
 
-  // Visual pit lane running parallel to the main straight.
+  // Functional pit lane from configured entry to exit.
   const pitPts: THREE.Vector3[] = [];
-  for (let i = 0; i <= 28; i++) {
-    const raw = .88 + (i / 28) * .18;
+  const pitSpan = (1 - ARDENNE_GP.pitEntry) + ARDENNE_GP.pitExit;
+  for (let i = 0; i <= 36; i++) {
+    const u = i / 36;
+    const raw = ARDENNE_GP.pitEntry + u * pitSpan;
     const t = raw % 1;
     const p = trackCurve.getPointAt(t);
     const tangent = trackCurve.getTangentAt(t).normalize();
     const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
-    const blend = Math.sin((i / 28) * Math.PI);
-    pitPts.push(p.clone().addScaledVector(side, -blend * 19).add(new THREE.Vector3(0, .12, 0)));
+    const blend = Math.sin(u * Math.PI);
+    pitPts.push(p.clone().addScaledVector(side, -blend * 21).add(new THREE.Vector3(0, .12, 0)));
   }
-  const pitCurve = new THREE.CatmullRomCurve3(pitPts, false, 'centripetal');
-  const pitSamples = 140;
+  const activePitCurve = new THREE.CatmullRomCurve3(pitPts, false, 'centripetal');
+  pitCurve = activePitCurve;
+  pitLaneLength = activePitCurve.getLength();
+  pitBoxPosition.copy(activePitCurve.getPointAt(PIT_BOX_T));
+
+  const pitSamples = 170;
   const pos: number[] = [];
   const idx: number[] = [];
   for (let i = 0; i <= pitSamples; i++) {
     const t = i / pitSamples;
-    const p = pitCurve.getPointAt(t);
-    const tangent = pitCurve.getTangentAt(Math.min(t, .999)).normalize();
+    const p = activePitCurve.getPointAt(t);
+    const tangent = activePitCurve.getTangentAt(Math.min(t, .999)).normalize();
     const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
-    const l = p.clone().addScaledVector(side, 3.2);
-    const r = p.clone().addScaledVector(side, -3.2);
+    const l = p.clone().addScaledVector(side, 3.4);
+    const r = p.clone().addScaledVector(side, -3.4);
     pos.push(l.x,l.y+.005,l.z,r.x,r.y+.005,r.z);
   }
   for (let i=0;i<pitSamples;i++) {
@@ -177,9 +191,36 @@ function addTrackEnvironment() {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
   g.setIndex(idx); g.computeVertexNormals();
-  const pit = new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x37383b,roughness:.9}));
+  const pit = new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x34363a,roughness:.9}));
   pit.receiveShadow=true;
   scene.add(pit);
+
+  // Pit box and simple crew markers make the stop location easy to read.
+  const boxTangent = activePitCurve.getTangentAt(PIT_BOX_T).normalize();
+  const pitBox = new THREE.Mesh(
+    new THREE.PlaneGeometry(5.6, 8.5),
+    new THREE.MeshBasicMaterial({ color: 0xf2f2f2, transparent: true, opacity: .42, side: THREE.DoubleSide })
+  );
+  pitBox.rotation.x = -Math.PI / 2;
+  pitBox.rotation.z = -Math.atan2(boxTangent.x, boxTangent.z);
+  pitBox.position.copy(pitBoxPosition).add(new THREE.Vector3(0, .03, 0));
+  scene.add(pitBox);
+
+  const crewGeo = new THREE.CylinderGeometry(.22, .28, 1.55, 8);
+  const crewMat = new THREE.MeshStandardMaterial({ color: 0x20242b, roughness: .75 });
+  const crewOffsets = [
+    [-2.15, -1.8], [2.15, -1.8], [-2.15, 1.8], [2.15, 1.8]
+  ];
+  const pitSide = new THREE.Vector3(-boxTangent.z, 0, boxTangent.x).normalize();
+  for (const [sideOffset, forwardOffset] of crewOffsets) {
+    const crew = new THREE.Mesh(crewGeo, crewMat);
+    crew.position.copy(pitBoxPosition)
+      .addScaledVector(pitSide, sideOffset)
+      .addScaledVector(boxTangent, forwardOffset);
+    crew.position.y += .8;
+    crew.castShadow = true;
+    scene.add(crew);
+  }
 }
 addTrackEnvironment();
 
@@ -422,9 +463,15 @@ const player = {
   slipstream: 0,
   onKerb: false,
   surface: 'TRACK',
-  offTrack: false
+  offTrack: false,
+  compound: 'MEDIUM' as TireCompoundId
 };
 scene.add(player.car);
+
+const pitStop = new PitStopSystem();
+let pitLaneProgress = 0;
+let pitPenaltySeconds = 0;
+let pitStopCount = 0;
 
 const aiColors = [0x3478f6,0xf0b429,0x54b948,0xae67ff,0xff7f32,0x36c2cf,0xe65c96,0xffffff,0xb8bcc7,0x8d99ae];
 const aiCars: Array<{ car: THREE.Group } & DriverState & { lane: number; baseSpeed: number }> = [];
@@ -448,6 +495,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyR') resetPlayer(true);
   if (e.code === 'Escape' && raceStarted) togglePause();
   if (e.code === 'KeyE' && player.drsReady) player.drs = !player.drs;
+  if (e.code === 'KeyP') togglePitRequest();
 });
 addEventListener('keyup', e => keys.delete(e.code));
 
@@ -539,6 +587,140 @@ function isGravelTrap(progress: number, distance: number) {
   });
 }
 
+function togglePitRequest() {
+  if (pitStop.state.phase === 'REQUESTED') {
+    pitStop.cancel();
+    showMessage('PIT REQUEST CANCELLED');
+    return;
+  }
+  if (pitStop.state.phase !== 'NONE') return;
+
+  const select = document.querySelector<HTMLSelectElement>('#pit-compound');
+  const compound = (select?.value ?? 'MEDIUM') as TireCompoundId;
+  pitStop.request({ compound, repairFrontWing: false });
+  showMessage(`BOX THIS LAP · ${compound}`, 3200);
+}
+
+function completeLapIfNeeded(raceTime: number) {
+  if (player.previousProgress > .88 && player.progress < .12 && raceTime - player.lapStartedAt > 15) {
+    const lapTime = raceTime - player.lapStartedAt;
+    player.bestLap = Math.min(player.bestLap, lapTime);
+    player.lap += 1;
+    player.lapStartedAt = raceTime;
+    showMessage(`LAP ${player.lap - 1} · ${formatTime(lapTime)}`);
+    if (player.lap > RACE_LAPS) {
+      finished = true;
+      showMessage(`CHEQUERED FLAG · BEST ${formatTime(player.bestLap)}`, 5000);
+      window.setTimeout(showFinalClassification, 900);
+    }
+  }
+}
+
+function updatePitLane(dt: number, raceTime: number): boolean {
+  if (!pitCurve) return false;
+
+  // A request becomes a pit entry once the car reaches the configured entry line.
+  if (pitStop.state.phase === 'REQUESTED') {
+    pitStop.step({
+      dt,
+      progress: player.progress,
+      speedMps: player.speed,
+      inPitLane: false,
+      inPitBox: false,
+      laneClear: true,
+      pitEntryProgress: ARDENNE_GP.pitEntry,
+      pitExitProgress: ARDENNE_GP.pitExit,
+      pitSpeedLimitMps: ARDENNE_GP.pitSpeedLimitMps,
+    });
+    if (pitStop.state.phase === 'ENTRY') {
+      pitLaneProgress = 0;
+      showMessage('PIT LANE · LIMITER', 2600);
+    } else {
+      return false;
+    }
+  }
+
+  if (pitStop.state.phase === 'NONE') return false;
+
+  const oldPhase = pitStop.state.phase;
+  const inService = oldPhase === 'STOPPED' || oldPhase === 'SERVICE';
+  const approachingBox = oldPhase === 'ENTRY' || oldPhase === 'LANE';
+  const exiting = oldPhase === 'RELEASE' || oldPhase === 'EXIT';
+
+  let targetSpeed = ARDENNE_GP.pitSpeedLimitMps - .7;
+  if (approachingBox && pitLaneProgress > PIT_BOX_T - .075) {
+    const remaining = Math.max(0, PIT_BOX_T - pitLaneProgress);
+    targetSpeed = Math.min(targetSpeed, remaining * pitLaneLength * .85);
+  }
+  if (inService) targetSpeed = 0;
+  if (exiting) targetSpeed = ARDENNE_GP.pitSpeedLimitMps - .5;
+
+  const accel = targetSpeed > player.speed ? 8.5 : 22;
+  player.speed = THREE.MathUtils.lerp(player.speed, targetSpeed, 1 - Math.exp(-dt * accel));
+
+  if (!inService) {
+    pitLaneProgress += (player.speed * dt) / Math.max(1, pitLaneLength);
+  }
+  if (approachingBox && pitLaneProgress >= PIT_BOX_T) {
+    pitLaneProgress = PIT_BOX_T;
+    player.speed = 0;
+  }
+  pitLaneProgress = THREE.MathUtils.clamp(pitLaneProgress, 0, 1);
+
+  const p = pitCurve.getPointAt(pitLaneProgress);
+  const tangent = pitCurve.getTangentAt(Math.min(.999, pitLaneProgress)).normalize();
+  player.position.copy(p).add(new THREE.Vector3(0, .22, 0));
+  player.heading = Math.atan2(tangent.x, tangent.z);
+  player.car.position.copy(player.position);
+  player.car.rotation.set(0, player.heading, 0);
+
+  player.previousProgress = player.progress;
+  const wrappedSpan = (1 - ARDENNE_GP.pitEntry) + ARDENNE_GP.pitExit;
+  player.progress = (ARDENNE_GP.pitEntry + pitLaneProgress * wrappedSpan) % 1;
+  completeLapIfNeeded(raceTime);
+
+  const inPitBox = Math.abs(pitLaneProgress - PIT_BOX_T) < .008;
+  const leavingLane = pitLaneProgress > .992;
+
+  pitStop.step({
+    dt,
+    progress: leavingLane ? ARDENNE_GP.pitExit : player.progress,
+    speedMps: player.speed,
+    inPitLane: !leavingLane,
+    inPitBox,
+    laneClear: true,
+    pitEntryProgress: ARDENNE_GP.pitEntry,
+    pitExitProgress: ARDENNE_GP.pitExit,
+    pitSpeedLimitMps: ARDENNE_GP.pitSpeedLimitMps,
+  });
+
+  if (pitStop.state.pitSpeeding) {
+    pitPenaltySeconds = Math.max(pitPenaltySeconds, 5);
+  }
+
+  if (oldPhase === 'SERVICE' && pitStop.state.phase !== 'SERVICE') {
+    player.compound = pitStop.state.compound;
+    player.tyre = 1;
+    player.tyreTemp = player.compound === 'SOFT' ? 88 : player.compound === 'HARD' ? 80 : 84;
+    pitStopCount += 1;
+    showMessage(`PIT STOP COMPLETE · ${player.compound}`, 3200);
+  }
+
+  if (pitStop.state.phase === 'NONE') {
+    const exit = trackCurve.getPointAt(ARDENNE_GP.pitExit);
+    const exitTangent = trackCurve.getTangentAt(ARDENNE_GP.pitExit).normalize();
+    player.position.copy(exit).add(new THREE.Vector3(0, .22, 0));
+    player.heading = Math.atan2(exitTangent.x, exitTangent.z);
+    player.progress = ARDENNE_GP.pitExit;
+    player.previousProgress = player.progress;
+    player.car.position.copy(player.position);
+    player.car.rotation.set(0, player.heading, 0);
+    showMessage(pitPenaltySeconds > 0 ? `PIT EXIT · +${pitPenaltySeconds}s PENALTY` : 'PIT EXIT', 2600);
+  }
+
+  return true;
+}
+
 function updatePlayer(dt: number, raceTime: number) {
   const throttleTarget = (keys.has('KeyW') || keys.has('ArrowUp') || touch.has('throttle')) ? 1 : 0;
   const brakeTarget = (keys.has('KeyS') || keys.has('ArrowDown') || touch.has('brake')) ? 1 : 0;
@@ -547,6 +729,8 @@ function updatePlayer(dt: number, raceTime: number) {
   player.brake = THREE.MathUtils.lerp(player.brake, brakeTarget, 1 - Math.exp(-dt * 12));
   player.steer = THREE.MathUtils.lerp(player.steer, steerTarget, 1 - Math.exp(-dt * 7));
   player.ersDeploy = (keys.has('Space') || touch.has('ers')) && player.ers > .005;
+
+  if (updatePitLane(dt, raceTime)) return;
 
   const trackInfo = nearestTrackProgress(player.position);
   player.previousProgress = player.progress;
@@ -558,7 +742,7 @@ function updatePlayer(dt: number, raceTime: number) {
 
   const ahead = closestCarAhead();
   player.slipstream = THREE.MathUtils.clamp((.04 - ahead.gap) / .03, 0, 1);
-  const drsZone = AURORA_RING.drsZones.some(zone =>
+  const drsZone = ARDENNE_GP.drsZones.some(zone =>
     player.progress >= zone.activationStart && player.progress <= zone.activationEnd
   );
   player.drsReady = drsZone && player.lap >= 2 && ahead.gap < .035;
@@ -578,10 +762,12 @@ function updatePlayer(dt: number, raceTime: number) {
   else player.ers = Math.min(1, player.ers + dt * (player.throttle < .3 ? .038 : .012));
 
   const steeringLimit = THREE.MathUtils.lerp(.61, .115, THREE.MathUtils.clamp(player.speed / 100, 0, 1));
-  const tempGrip = THREE.MathUtils.clamp(1 - Math.abs(player.tyreTemp - 96) / 90, .72, 1);
+  const targetTemp = player.compound === 'SOFT' ? 100 : player.compound === 'HARD' ? 94 : 98;
+  const compoundGrip = player.compound === 'SOFT' ? 1.035 : player.compound === 'HARD' ? .975 : 1;
+  const tempGrip = THREE.MathUtils.clamp(1 - Math.abs(player.tyreTemp - targetTemp) / 90, .72, 1);
   const wearGrip = THREE.MathUtils.lerp(.78, 1, player.tyre);
   const surfaceGrip = gravel ? .32 : player.offTrack ? .5 : player.onKerb ? .84 : 1;
-  const grip = tempGrip * wearGrip * surfaceGrip;
+  const grip = tempGrip * wearGrip * surfaceGrip * compoundGrip;
   const aeroGrip = THREE.MathUtils.lerp(.78, 1.18, THREE.MathUtils.clamp(player.speed / 92,0,1));
   const yawRate = player.steer * steeringLimit * grip * aeroGrip * (player.speed / 13) / (1 + player.speed / 36);
   player.heading += yawRate * dt;
@@ -605,22 +791,12 @@ function updatePlayer(dt: number, raceTime: number) {
   const cooling = (player.tyreTemp - 82) * (.035 + player.speed * .00042);
   player.tyreTemp = THREE.MathUtils.clamp(player.tyreTemp + (heatIn - cooling) * dt, 65, 130);
   const heatWear = 1 + Math.max(0, player.tyreTemp - 103) * .025;
-  const wearRate = (Math.abs(player.steer) * .00005 + player.brake * .000032 + player.throttle * .000011) * (1 + player.speed / 85) * heatWear;
+  const compoundWear = player.compound === 'SOFT' ? 1.22 : player.compound === 'HARD' ? .68 : .88;
+  const wearRate = (Math.abs(player.steer) * .00005 + player.brake * .000032 + player.throttle * .000011) * (1 + player.speed / 85) * heatWear * compoundWear;
   player.tyre = Math.max(.52, player.tyre - wearRate * dt * 60);
 
   // Start/finish wrap detection.
-  if (player.previousProgress > .88 && player.progress < .12 && player.speed > 8 && raceTime - player.lapStartedAt > 15) {
-    const lapTime = raceTime - player.lapStartedAt;
-    player.bestLap = Math.min(player.bestLap, lapTime);
-    player.lap += 1;
-    player.lapStartedAt = raceTime;
-    showMessage(`LAP ${player.lap - 1} · ${formatTime(lapTime)}`);
-    if (player.lap > RACE_LAPS) {
-      finished = true;
-      showMessage(`CHEQUERED FLAG · BEST ${formatTime(player.bestLap)}`, 5000);
-      window.setTimeout(showFinalClassification, 900);
-    }
-  }
+  if (player.speed > 8) completeLapIfNeeded(raceTime);
 }
 
 function updateAI(dt: number, racing: boolean) {
@@ -705,6 +881,9 @@ const els = {
   ersInd: document.querySelector<HTMLElement>('#ers-indicator')!,
   draft: document.querySelector<HTMLElement>('#draft-indicator')!,
   surface: document.querySelector<HTMLElement>('#surface-indicator')!,
+  pit: document.querySelector<HTMLElement>('#pit-indicator')!,
+  pitStatus: document.querySelector<HTMLElement>('#pit-status')!,
+  compound: document.querySelector<HTMLElement>('#compound-text')!,
   lights: document.querySelector<HTMLElement>('#start-lights')!,
   countdown: document.querySelector<HTMLElement>('#countdown')!,
   message: document.querySelector<HTMLElement>('#message')!,
@@ -779,7 +958,21 @@ function updateHUD(raceTime: number, now: number) {
   els.draft.classList.toggle('active', player.slipstream > .25);
   els.surface.textContent = player.surface;
   els.surface.classList.toggle('warning', player.surface !== 'TRACK');
-  els.status.textContent = finished ? 'CHEQUERED FLAG' : player.drsReady ? 'DRS AVAILABLE' : player.slipstream > .35 ? 'SLIPSTREAM' : player.surface !== 'TRACK' ? player.surface : cameraMode.toUpperCase();
+  const pitPhase = pitStop.state.phase;
+  els.pit.textContent = pitPhase === 'NONE' ? 'PIT' : pitPhase;
+  els.pit.classList.toggle('active', pitPhase !== 'NONE');
+  els.pitStatus.textContent =
+    pitPhase === 'SERVICE'
+      ? `SERVICE ${Math.max(0, pitStop.state.requiredServiceS - pitStop.state.serviceElapsedS).toFixed(1)}s`
+      : pitPhase === 'REQUESTED'
+        ? `BOX THIS LAP · ${pitStop.state.compound}`
+        : pitPhase !== 'NONE'
+          ? `PIT · ${pitPhase}`
+          : pitPenaltySeconds > 0
+            ? `PENALTY +${pitPenaltySeconds}s`
+            : `STOPS ${pitStopCount}`;
+  els.compound.textContent = player.compound;
+  els.status.textContent = finished ? 'CHEQUERED FLAG' : pitPhase !== 'NONE' ? `PIT ${pitPhase}` : player.drsReady ? 'DRS AVAILABLE' : player.slipstream > .35 ? 'SLIPSTREAM' : player.surface !== 'TRACK' ? player.surface : cameraMode.toUpperCase();
   drawMinimap();
 
   if (!raceStarted) return;
@@ -827,7 +1020,7 @@ function showFinalClassification() {
   ).join('');
 
   const pos = entries.findIndex(entry => entry.name.startsWith('YOU')) + 1;
-  resultTitle.textContent = `P${pos} · RACE COMPLETE`;
+  resultTitle.textContent = `P${pos} · RACE COMPLETE${pitPenaltySeconds ? ` · +${pitPenaltySeconds}s` : ''}`;
   overlay.classList.add('active');
   els.mobile.classList.add('hidden');
 }
@@ -855,6 +1048,7 @@ document.querySelector<HTMLButtonElement>('#start-btn')!.addEventListener('click
   if (matchMedia('(pointer: coarse)').matches || innerWidth < 800) els.mobile.classList.remove('hidden');
 });
 document.querySelector<HTMLButtonElement>('#resume-btn')!.addEventListener('click', togglePause);
+document.querySelector<HTMLButtonElement>('#box-btn')!.addEventListener('click', togglePitRequest);
 
 let last = performance.now();
 let accumulator = 0;
