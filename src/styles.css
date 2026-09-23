@@ -145,3 +145,65 @@ button { font: inherit; }
   background: rgba(255,255,255,.13);
   border-color: rgba(255,255,255,.3);
 }
+
+
+/* V3 live pit strategy */
+.pit-panel {
+  position: absolute;
+  left: 16px;
+  bottom: 22px;
+  width: 190px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(7,8,12,.74);
+  border: 1px solid rgba(255,255,255,.12);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+  display: grid;
+  gap: 9px;
+}
+.pit-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .06em;
+}
+.pit-meta span { opacity: .68; }
+.pit-panel label {
+  display: grid;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  color: rgba(255,255,255,.62);
+}
+.pit-panel select,
+.pit-panel button {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 10px;
+  background: rgba(255,255,255,.08);
+  color: #fff;
+  font: inherit;
+  font-weight: 900;
+}
+.pit-panel select { padding: 8px; }
+.pit-panel option { color: #111; }
+.pit-panel button {
+  cursor: pointer;
+  padding: 10px 9px;
+  background: #fff;
+  color: #090a0f;
+}
+@media (pointer: coarse), (max-width: 800px) {
+  .pit-panel {
+    left: 8px;
+    bottom: 198px;
+    width: 168px;
+    padding: 9px;
+  }
+  .pit-panel button { padding: 8px; font-size: 10px; }
+}
