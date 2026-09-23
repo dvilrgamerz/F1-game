@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#090a0f" />
-    <title>DVILR GP v2 — Web Formula Racing</title>
+    <title>DVILR GP v3 — Web Formula Racing</title>
   </head>
   <body>
     <div id="app">
@@ -12,15 +12,25 @@
 
       <div id="start-overlay" class="screen active">
         <div class="panel hero-panel">
-          <div class="eyebrow">DVILR GP · VERSION 2</div>
+          <div class="eyebrow">DVILR GP · VERSION 3 ALPHA</div>
           <h1>DVILR GP</h1>
-          <p>High-speed browser Formula racing with an original circuit, 20-car grid, tyre temperature, slipstream, DRS/ERS strategy and upgraded track detail.</p>
+          <p>A deeper browser Formula racing sim with an original 10-lap Grand Prix, elevated circuit, 20-car field, V3 physics architecture, DRS/ERS strategy and full race classification.</p>
           <div class="feature-row">
-            <span>20-car grid</span><span>Tyre temp + wear</span><span>Slipstream</span><span>DRS + ERS</span><span>Kerbs + runoff</span><span>3 cameras</span>
+            <span>10-lap GP</span><span>20 cars</span><span>Elevated circuit</span><span>V3 physics core</span><span>DRS + ERS</span><span>Full results</span>
           </div>
           <button id="start-btn">START GRAND PRIX</button>
           <div class="controls-copy">W/↑ throttle · S/↓ brake · A/D steer · Space ERS · E DRS · C camera · R reset · Esc pause</div>
-          <div class="version-note">V2 keeps all branding, cars and circuit design original.</div>
+          <div class="version-note">V3 uses original branding, cars and circuit design. Rapier-based physical vehicle work now lives under src/v3.</div>
+        </div>
+      </div>
+
+
+      <div id="finish-overlay" class="screen">
+        <div class="panel results-panel">
+          <div class="eyebrow">AURORA INTERNATIONAL CIRCUIT</div>
+          <h2 id="finish-title">RACE COMPLETE</h2>
+          <div id="results-body" class="results-body"></div>
+          <button onclick="location.reload()">RACE AGAIN</button>
         </div>
       </div>
 
@@ -34,7 +44,7 @@
 
       <div id="hud" class="hidden">
         <div class="topbar">
-          <div class="race-chip"><b id="position">P20</b><span id="lap">LAP 1/5</span></div>
+          <div class="race-chip"><b id="position">P20</b><span id="lap">LAP 1/10</span></div>
           <div class="race-chip center"><span id="race-status">FORMATION</span><b id="lap-time">00:00.000</b></div>
           <div class="race-chip right"><span>BEST</span><b id="best-time">--:--.---</b></div>
           <canvas id="minimap" width="180" height="120" aria-label="Circuit minimap"></canvas>
