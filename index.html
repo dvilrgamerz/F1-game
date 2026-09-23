@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#090a0f" />
+    <title>DVILR GP — Web Formula Prototype</title>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game"></canvas>
+
+      <div id="start-overlay" class="screen active">
+        <div class="panel hero-panel">
+          <div class="eyebrow">WEB FORMULA RACING PROTOTYPE</div>
+          <h1>DVILR GP</h1>
+          <p>F1-style browser racing prototype. Original cars, teams and circuit.</p>
+          <div class="feature-row">
+            <span>20-car grid</span><span>ERS</span><span>DRS</span><span>Tyre wear</span><span>3 cameras</span>
+          </div>
+          <button id="start-btn">START GRAND PRIX</button>
+          <div class="controls-copy">W/↑ throttle · S/↓ brake · A/D steer · Space ERS · E DRS · C camera · R reset · Esc pause</div>
+        </div>
+      </div>
+
+      <div id="pause-overlay" class="screen">
+        <div class="panel compact-panel">
+          <div class="eyebrow">RACE CONTROL</div>
+          <h2>PAUSED</h2>
+          <button id="resume-btn">RESUME</button>
+        </div>
+      </div>
+
+      <div id="hud" class="hidden">
+        <div class="topbar">
+          <div class="race-chip"><b id="position">P20</b><span id="lap">LAP 1/5</span></div>
+          <div class="race-chip center"><span id="race-status">FORMATION</span><b id="lap-time">00:00.000</b></div>
+          <div class="race-chip right"><span>BEST</span><b id="best-time">--:--.---</b></div>
+        </div>
+
+        <div class="telemetry">
+          <div class="speed-stack">
+            <div id="gear" class="gear">N</div>
+            <div><span id="speed" class="speed">0</span><span class="unit">KM/H</span></div>
+          </div>
+          <div class="bars">
+            <div class="bar-row"><span>THR</span><div class="bar"><i id="throttle-bar"></i></div></div>
+            <div class="bar-row"><span>BRK</span><div class="bar"><i id="brake-bar"></i></div></div>
+            <div class="bar-row"><span>ERS</span><div class="bar"><i id="ers-bar"></i></div><b id="ers-text">100%</b></div>
+            <div class="bar-row"><span>TYRE</span><div class="bar"><i id="tyre-bar"></i></div><b id="tyre-text">100%</b></div>
+          </div>
+          <div class="systems">
+            <div id="drs-indicator" class="system-pill">DRS</div>
+            <div id="ers-indicator" class="system-pill">OVERTAKE</div>
+          </div>
+        </div>
+
+        <div id="countdown" class="countdown"></div>
+        <div id="message" class="message"></div>
+      </div>
+
+      <div id="mobile-controls" class="mobile-controls hidden">
+        <div class="mobile-left">
+          <button data-touch="left">◀</button>
+          <button data-touch="right">▶</button>
+        </div>
+        <div class="mobile-right">
+          <button data-touch="brake" class="brake-btn">BRAKE</button>
+          <button data-touch="throttle" class="throttle-btn">THROTTLE</button>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
