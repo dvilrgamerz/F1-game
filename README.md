@@ -1,24 +1,67 @@
-# DVILR GP — Web Formula Prototype v0.1
+# DVILR GP — Web Formula Racing v2
 
-A browser-first 3D open-wheel racing prototype inspired by the depth and race-weekend feel of modern Formula racing games, without copying official F1 branding, team liveries, driver likenesses, logos, or proprietary game assets.
+A browser-first 3D open-wheel racing game built with Three.js, TypeScript and Vite. The goal is to capture the systems-level depth of modern Formula racing games while keeping the branding, cars, drivers and circuit original.
 
-## What is already in v0.1
+## V2 highlights
 
-- Three.js + TypeScript + Vite
-- Procedural 3D Formula-style car (no copyrighted assets)
-- Original closed circuit generated from a spline
-- 20-car race grid (1 player + 19 AI)
-- 5-lap Grand Prix loop
-- Fixed-step 120 Hz driving simulation
+### Track and environment
+- Original high-speed circuit
+- Raised red/white corner kerbs
+- Green runoff around the racing surface
+- Gravel traps at selected high-risk corners
+- Instanced track barriers and trackside markers
+- Instanced vegetation for better depth without hundreds of separate draw calls
+- Visual pit-lane route beside the main straight
+- Start/finish line and 5-light race start
+
+### Driving model
+- 120 Hz fixed-step simulation
 - Speed-dependent steering
-- Basic drag, braking, off-track grip loss and tyre wear
-- ERS/overtake deployment
-- DRS-style straight-line system
-- Auto gearbox telemetry
-- Chase, cockpit and broadcast cameras
-- Live position, lap time and best lap HUD
-- Keyboard + basic mobile touch controls
-- Responsive browser UI
+- Basic aerodynamic grip scaling with speed
+- Surface-specific grip for asphalt, kerb, runoff and gravel
+- Tyre wear
+- Tyre temperature with an operating window
+- Heat-driven tyre degradation
+- ERS/overtake deployment and recharge
+- Slipstream that reduces drag behind another car
+- Two DRS-style zones
+- DRS eligibility based on race lap and a nearby car ahead
+- Automatic DRS closure under braking
+
+### Racing
+- 20-car field: player + 19 AI cars
+- Five-lap Grand Prix
+- AI slows according to local circuit curvature
+- AI uses changing lateral racing lines instead of one fixed train
+- Live race position
+- Lap timing and best lap
+- Three cameras: chase, cockpit and broadcast
+- Full start-light sequence
+
+### V2 HUD
+- Speed and automatic gear display
+- Throttle and brake telemetry
+- ERS level
+- Tyre life
+- Tyre temperature
+- DRS ready/active indication
+- Slipstream indication
+- Current track surface
+- Live circuit minimap
+- Desktop and mobile layouts
+
+## Controls
+
+- W / Up — throttle
+- S / Down — brake
+- A / D or Left / Right — steer
+- Space — hold ERS overtake
+- E — open/close DRS when eligible
+- C — change camera
+- R — reset car
+- Esc — pause
+
+Touch devices also get steering, throttle, brake, ERS and DRS controls.
 
 ## Run locally
 
@@ -27,91 +70,47 @@ npm install
 npm run dev
 ```
 
-Open the local URL Vite prints in your browser.
+Production build:
 
-## Controls
+```bash
+npm run build
+```
 
-- W / Up: throttle
-- S / Down: brake
-- A / D or Left / Right: steer
-- Space: ERS overtake deployment
-- E: toggle DRS when in the DRS zone
-- C: change camera
-- R: reset car
-- Esc: pause
+## Stack
 
-## Production architecture for the full game
+- Three.js
+- TypeScript
+- Vite
+- DOM-based racing HUD
+- InstancedMesh for repeated track objects
 
-The full project should keep simulation state outside the Three.js renderer. Recommended top-level modules:
+## Why v2 is structured this way
 
-- `simulation/vehicle`: tyre slip, load transfer, aero map, power unit, ERS, fuel, damage
-- `simulation/race`: sessions, grids, flags, penalties, timing, safety car/VSC, pit rules
-- `simulation/ai`: racing line, overtaking, defending, strategy and mistakes
-- `render/`: scene, cameras, weather, lighting, particles, replays
-- `assets/`: GLB/glTF cars, tracks, pit/garage props, KTX2 textures, LODs
-- `ui/`: DOM HUD, race engineer, garage setup, results, career screens
-- `online/`: authoritative multiplayer service and anti-cheat validation
-- `diagnostics/`: frame timing, telemetry export, AI debug, replay inspection
+The simulation remains separate from Three.js rendering state. That gives future versions room for a real four-wheel tyre model, suspension, collisions, pit rules, damage, multiplayer and replays without turning the scene graph into the source of truth.
 
-## Roadmap toward an F1-25-level feature set
+Three.js recommends `InstancedMesh` when many objects reuse the same geometry/material because it reduces draw calls. V2 uses that pattern for barriers, markers, vegetation and kerbs.
 
-### v0.2 — Driving physics
-- Four-wheel tyre model with slip angle/slip ratio
-- Load sensitivity and temperature windows
-- Differential, brake bias, engine braking
-- Ride height, aero balance, dirty air and slipstream
-- Kerb/grass/gravel surface materials
-- Controller deadzones and steering curves
+## Next: v3
 
-### v0.3 — Race systems
-- Practice / qualifying / race weekend
-- Starts, jump-start detection, flags and penalties
-- Pit lane, pit limiter, tyre compounds and strategy
-- Fuel and ERS strategy
-- DRS detection/activation rules
-- Weather + drying racing line
+- Four independent wheels with slip ratio + slip angle
+- Brake lockups and wheelspin
+- Differential + brake bias
+- Suspension/load transfer
+- Actual barrier/car collision response with Rapier
+- Pit entry/exit gameplay and pit limiter
+- Soft/medium/hard tyre compounds
+- Fuel load and race strategy
+- Yellow flags, penalties and track limits
+- Dynamic weather + wet grip + drying line
+- Better overtaking/defending AI
+- Replays and race highlights
+- Garage/car-setup screen
+- Controller/gamepad mapping
 
-### v0.4 — AI
-- 20-driver personality profiles
-- Overtake/defend logic
-- Multi-line racing
-- Mistakes, lockups and spins
-- Strategy calls and pit windows
-- Difficulty scaling
+## Research notes
 
-### v0.5 — Presentation
-- Replay cameras and highlights
-- Race engineer messages
-- Full HUD customization
-- Garage setup UI
-- Photo/replay mode
-- Broadcast-style results and podium sequence
+See `V2_RESEARCH.md` and `F1_25_RESEARCH_BLUEPRINT.md`.
 
-### v0.6 — Team/Career
-- Original 10-team championship + custom 11th team
-- Two-driver team ownership
-- Engineering / personnel / commercial facilities
-- R&D and part development
-- Driver market and contracts
-- Sponsors and livery editor
-- Multi-season progression
+## Branding / licensing
 
-### v0.7 — Multiplayer
-- Private lobbies
-- Ranked races
-- Spectating
-- Race director tools
-- Reconnect handling
-- Server-validated race state
-
-### v1.0 — Web release
-- Optimized GLB + Meshopt geometry
-- KTX2/Basis textures
-- LOD and instancing budgets
-- Desktop high quality + mobile performance presets
-- Accessibility and remappable controls
-- Full original championship content
-
-## Legal / branding boundary
-
-To publish safely without licenses, use original game branding, original driver names, fictional teams, original car liveries, original sponsor marks, original voice lines and original circuit environments. Do not package EA/Codemasters assets or official Formula 1 team/driver branding into the project without permission.
+This project is Formula-racing inspired. It should use original game branding, fictional teams/drivers, original liveries, original sponsors and original circuit environments unless separate permission is obtained for licensed content.
