@@ -7,6 +7,18 @@
 
 DVILR GP is an original browser-based open-wheel racing project built with Three.js, TypeScript and Vite. V3 begins the transition from the V2 kinematic prototype to a much more physically grounded Formula-style racing architecture.
 
+## Steering, controller and circuit upgrades (October 2026)
+
+This version corrects the **A/Left and D/Right** steering signs, and fixes the visual car direction (its nose now faces the direction of travel). The playable player car uses a simplified, speed-sensitive **bicycle-model yaw calculation**, with lateral-G limits varying by speed, tyre temperature, wear, compound, and on/off-track grip. Front tyres visibly steer; wheels rotate with ground speed; the procedural car now has a narrower open-wheel silhouette and improved details.
+
+**Gamepad (standard Xbox/PlayStation mapping):** left stick steers; **RT/R2** throttles; **LT/L2** brakes; **A/Cross** deploys ERS (hold); **B/Circle** toggles DRS when allowed; **X/Square** requests a pit stop; **Y/Triangle** changes camera; **Menu/Options** pauses/resumes; **A/Cross** starts at the title screen. Keyboard: W/Up accelerate, S/Down brake, A/Left steer left, D/Right steer right, Space ERS, E DRS, P pit, C camera, R car reset, Esc pause.
+
+The original Ardenne GP control-point layout is now scaled to approximately **7.004 km** of physical race distance, keeping its original elevation profile. AI progress uses the curve's actual measured length. The minimap draws the undistorted track plan, DRS zones, opponent cars, and heading arrow. The new telemetry shows front steering degrees and lateral G.
+
+**Testing:** run `npm test` for steering and track regression checks and `python3 tools/handling_audit.py` for an offline numerical audit (Python is a QA tool; the browser racing game uses TypeScript/Three.js). GitHub Actions checks unit tests, Python, TypeScript and Vite builds.
+
+**Physics scope:** these changes fix the existing playable kinematic car. It is **not yet a full real-world F1 simulator**, and the separate Rapier/four-wheel tyre contact/force model is not yet connected to the rendered vehicle. No official team, track scans, or manufacturer assets are used.
+
 ## What is playable now
 
 The live game still uses the lightweight V2-derived movement loop for the cars while V3 physical vehicle modules are being migrated in, but the V3 race systems are now connected to gameplay.
