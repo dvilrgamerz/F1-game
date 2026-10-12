@@ -3,6 +3,7 @@ import './styles.css';
 import { ARDENNE_GP } from './v3/track/ardenneGP';
 import { PitStopSystem, type PitPhase } from './v3/race/PitStopSystem';
 import type { TireCompoundId } from './v3/types';
+import { shapeStick, stepSteering } from './v3/physics/SteeringModel';
 
 type CameraMode = 'chase' | 'cockpit' | 'broadcast';
 type TouchAction = 'left' | 'right' | 'throttle' | 'brake' | 'ers';
@@ -447,6 +448,9 @@ const player = {
   heading: 0,
   speed: 0,
   steer: 0,
+  yawRate: 0,
+  frontAngle: 0,
+  lateralG: 0,
   throttle: 0,
   brake: 0,
   progress: 0,
@@ -520,10 +524,13 @@ function resetPlayer(keepRace = false) {
   player.heading = Math.atan2(tangent.x, tangent.z);
   player.speed = 0;
   player.steer = 0;
+  player.yawRate = 0;
+  player.frontAngle = 0;
+  player.lateralG = 0;
   player.progress = .002;
   player.previousProgress = .002;
   player.car.position.copy(player.position);
-  player.car.rotation.set(0, player.heading, 0);
+  player.car.rotation.set(0, player.heading + Math.PI, 0);
   if (!keepRace) {
     player.lap = 1;
     player.ers = 1;
@@ -673,7 +680,7 @@ function updatePitLane(dt: number, raceTime: number): boolean {
   player.position.copy(p).add(new THREE.Vector3(0, .22, 0));
   player.heading = Math.atan2(tangent.x, tangent.z);
   player.car.position.copy(player.position);
-  player.car.rotation.set(0, player.heading, 0);
+  player.car.rotation.set(0, player.heading + Math.PI, 0);
 
   player.previousProgress = player.progress;
   const wrappedSpan = (1 - ARDENNE_GP.pitEntry) + ARDENNE_GP.pitExit;
@@ -716,7 +723,7 @@ function updatePitLane(dt: number, raceTime: number): boolean {
     player.progress = ARDENNE_GP.pitExit;
     player.previousProgress = player.progress;
     player.car.position.copy(player.position);
-    player.car.rotation.set(0, player.heading, 0);
+    player.car.rotation.set(0, player.heading + Math.PI, 0);
     showMessage(pitPenaltySeconds > 0 ? `PIT EXIT · +${pitPenaltySeconds}s PENALTY` : 'PIT EXIT', 2600);
   }
 
@@ -724,13 +731,17 @@ function updatePitLane(dt: number, raceTime: number): boolean {
 }
 
 function updatePlayer(dt: number, raceTime: number) {
-  const throttleTarget = (keys.has('KeyW') || keys.has('ArrowUp') || touch.has('throttle')) ? 1 : 0;
-  const brakeTarget = (keys.has('KeyS') || keys.has('ArrowDown') || touch.has('brake')) ? 1 : 0;
-  const steerTarget = (keys.has('KeyA') || keys.has('ArrowLeft') || touch.has('left') ? 1 : 0) + (keys.has('KeyD') || keys.has('ArrowRight') || touch.has('right') ? -1 : 0);
-  player.throttle = THREE.MathUtils.lerp(player.throttle, throttleTarget, 1 - Math.exp(-dt * 8));
-  player.brake = THREE.MathUtils.lerp(player.brake, brakeTarget, 1 - Math.exp(-dt * 12));
-  player.steer = THREE.MathUtils.lerp(player.steer, steerTarget, 1 - Math.exp(-dt * 7));
-  player.ersDeploy = (keys.has('Space') || touch.has('ers')) && player.ers > .005;
+  const pad = readGamepad();
+  const throttleTarget = Math.max((keys.has('KeyW') || keys.has('ArrowUp') || touch.has('throttle')) ? 1 : 0, pad?.throttle ?? 0);
+  const brakeTarget = Math.max((keys.has('KeyS') || keys.has('ArrowDown') || touch.has('brake')) ? 1 : 0, pad?.brake ?? 0);
+  // The car travels along +Z, so A/Left is negative yaw, D/Right positive yaw.
+  const keySteer = (keys.has('KeyD') || keys.has('ArrowRight') || touch.has('right') ? 1 : 0)
+    - (keys.has('KeyA') || keys.has('ArrowLeft') || touch.has('left') ? 1 : 0);
+  const steerTarget = keySteer !== 0 ? keySteer : (pad?.steer ?? 0);
+  player.throttle = THREE.MathUtils.lerp(player.throttle, throttleTarget, 1 - Math.exp(-dt * 10));
+  player.brake = THREE.MathUtils.lerp(player.brake, brakeTarget, 1 - Math.exp(-dt * 14));
+  player.steer = THREE.MathUtils.lerp(player.steer, steerTarget, 1 - Math.exp(-dt * 13));
+  player.ersDeploy = (keys.has('Space') || touch.has('ers') || pad?.ers) && player.ers > .005;
 
   if (updatePitLane(dt, raceTime)) return;
 
@@ -763,31 +774,31 @@ function updatePlayer(dt: number, raceTime: number) {
   if (player.ersDeploy) player.ers = Math.max(0, player.ers - dt * .085);
   else player.ers = Math.min(1, player.ers + dt * (player.throttle < .3 ? .038 : .012));
 
-  const steeringLimit = THREE.MathUtils.lerp(.61, .115, THREE.MathUtils.clamp(player.speed / 100, 0, 1));
   const targetTemp = player.compound === 'SOFT' ? 100 : player.compound === 'HARD' ? 94 : 98;
   const compoundGrip = player.compound === 'SOFT' ? 1.035 : player.compound === 'HARD' ? .975 : 1;
   const tempGrip = THREE.MathUtils.clamp(1 - Math.abs(player.tyreTemp - targetTemp) / 90, .72, 1);
   const wearGrip = THREE.MathUtils.lerp(.78, 1, player.tyre);
   const surfaceGrip = gravel ? .32 : player.offTrack ? .5 : player.onKerb ? .84 : 1;
   const grip = tempGrip * wearGrip * surfaceGrip * compoundGrip;
-  const aeroGrip = THREE.MathUtils.lerp(.78, 1.18, THREE.MathUtils.clamp(player.speed / 92,0,1));
-  const yawRate = player.steer * steeringLimit * grip * aeroGrip * (player.speed / 13) / (1 + player.speed / 36);
-  player.heading += yawRate * dt;
-
-  // Mild stability: car aligns toward track direction when on-track, preserving player control.
-  if (!player.offTrack && player.speed > 8) {
-    const tangent = trackCurve.getTangentAt(player.progress).normalize();
-    const trackHeading = Math.atan2(tangent.x, tangent.z);
-    let diff = trackHeading - player.heading;
-    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-    player.heading += diff * dt * .24;
-  }
+  // Physically interpretable bicycle-model steering with a lateral grip limit.
+  // No invisible auto-steering toward the racing line: player inputs decide the turn.
+  const handling = stepSteering({
+    speed: player.speed,
+    command: player.steer,
+    grip,
+    previousYawRate: player.yawRate,
+    dt,
+  });
+  player.yawRate = handling.yawRate;
+  player.frontAngle = handling.frontAngle;
+  player.lateralG = handling.lateralG;
+  player.heading += player.yawRate * dt;
 
   const forward = new THREE.Vector3(Math.sin(player.heading), 0, Math.cos(player.heading));
   player.position.addScaledVector(forward, player.speed * dt);
   player.position.y = trackCurve.getPointAt(player.progress).y + .22;
   player.car.position.copy(player.position);
-  player.car.rotation.set(0, player.heading, 0);
+  player.car.rotation.set(0, player.heading + Math.PI, 0);
 
   const heatIn = Math.abs(player.steer) * player.speed * .014 + player.brake * 5.8 + player.throttle * 1.3;
   const cooling = (player.tyreTemp - 82) * (.035 + player.speed * .00042);
@@ -813,7 +824,7 @@ function updateAI(dt: number, racing: boolean) {
       ai.speed = THREE.MathUtils.lerp(ai.speed, target, dt * 1.15);
       ai.lane = THREE.MathUtils.lerp(ai.lane, Math.sin(ai.progress * Math.PI * 10 + i * .8) * 1.65, dt * .55);
       const old = ai.progress;
-      ai.progress = (ai.progress + (ai.speed * dt) / 1900) % 1;
+      ai.progress = (ai.progress + (ai.speed * dt) / trackCurve.getLength()) % 1;
       if (old > .95 && ai.progress < .05) ai.lap++;
     }
     const p = trackCurve.getPointAt(ai.progress);
@@ -822,7 +833,7 @@ function updateAI(dt: number, racing: boolean) {
     p.addScaledVector(side, ai.lane);
     p.y += .22;
     ai.car.position.copy(p);
-    ai.car.rotation.y = Math.atan2(tangent.x, tangent.z);
+    ai.car.rotation.y = Math.atan2(tangent.x, tangent.z) + Math.PI;
   }
 }
 
