@@ -477,7 +477,9 @@ function createFormulaCar(bodyColor: number): THREE.Group {
 function animateWheels(car: THREE.Group, frontWheelAngle: number, speed: number, dt: number): void {
   const front = car.userData.steeringPivots as THREE.Group[] | undefined;
   const rolling = car.userData.rollingWheels as THREE.Group[] | undefined;
-  for (const pivot of front ?? []) pivot.rotation.y = frontWheelAngle;
+  // The model's nose points along local -Z, so positive local Y rotation
+  // visually points the front wheels left. Negate to match right-positive input.
+  for (const pivot of front ?? []) pivot.rotation.y = -frontWheelAngle;
   // Wheel radius 0.43 m; spin is purely visual, including in the pit lane.
   for (const wheel of rolling ?? []) wheel.rotation.x -= (speed / .43) * dt;
 }
