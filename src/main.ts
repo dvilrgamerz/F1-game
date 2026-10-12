@@ -487,6 +487,46 @@ for (let i = 0; i < 19; i++) {
 
 const keys = new Set<string>();
 const touch = new Set<TouchAction>();
+
+function connectedPad(): Gamepad | null {
+  try {
+    return Array.from(navigator.getGamepads?.() ?? []).find((p): p is Gamepad => !!p && p.connected) ?? null;
+  } catch {
+    return null;
+  }
+}
+function readGamepad(): { steer: number; throttle: number; brake: number; ers: boolean } | null {
+  const pad = connectedPad();
+  if (!pad) return null;
+  return {
+    steer: shapeStick(pad.axes[0] ?? 0),
+    throttle: THREE.MathUtils.clamp(pad.buttons[7]?.value ?? 0, 0, 1), // RT
+    brake: THREE.MathUtils.clamp(pad.buttons[6]?.value ?? 0, 0, 1), // LT
+    ers: !!pad.buttons[0]?.pressed, // A / Cross
+  };
+}
+
+// Edge-triggered controller shortcuts, including pause when the simulation is stopped.
+const padButtonsHeld = new Set<number>();
+function pollControllerShortcuts(): void {
+  const pad = connectedPad();
+  if (!pad) { padButtonsHeld.clear(); return; }
+  const actions: Record<number, () => void> = {
+    0: () => { if (!raceStarted) document.querySelector<HTMLButtonElement>('#start-btn')?.click(); },
+    1: () => { if (raceStarted && player.drsReady) player.drs = !player.drs; }, // B
+    2: () => { if (raceStarted) togglePitRequest(); }, // X
+    3: () => { if (raceStarted) cameraMode = cameraMode === 'chase' ? 'cockpit' : cameraMode === 'cockpit' ? 'broadcast' : 'chase'; }, // Y
+    9: () => { if (raceStarted) togglePause(); }, // Menu / Start
+  };
+  for (const [indexText, action] of Object.entries(actions)) {
+    const index = Number(indexText);
+    const isDown = !!pad.buttons[index]?.pressed;
+    if (isDown && !padButtonsHeld.has(index)) action();
+    if (isDown) padButtonsHeld.add(index);
+    else padButtonsHeld.delete(index);
+  }
+}
+
 let cameraMode: CameraMode = 'chase';
 let raceStarted = false;
 let paused = false;
@@ -494,19 +534,22 @@ let raceStartAt = 0;
 let finished = false;
 
 addEventListener('keydown', e => {
+  if (raceStarted && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
   keys.add(e.code);
+  if (e.repeat) return; // Avoid repeated pause, camera, pit or DRS toggles.
   if (e.code === 'KeyC') cameraMode = cameraMode === 'chase' ? 'cockpit' : cameraMode === 'cockpit' ? 'broadcast' : 'chase';
-  if (e.code === 'KeyR') resetPlayer(true);
+  if (e.code === 'KeyR' && raceStarted) resetPlayer(true);
   if (e.code === 'Escape' && raceStarted) togglePause();
-  if (e.code === 'KeyE' && player.drsReady) player.drs = !player.drs;
-  if (e.code === 'KeyP') togglePitRequest();
+  if (e.code === 'KeyE' && raceStarted && player.drsReady) player.drs = !player.drs;
+  if (e.code === 'KeyP' && raceStarted) togglePitRequest();
 });
 addEventListener('keyup', e => keys.delete(e.code));
+addEventListener('blur', () => { keys.clear(); touch.clear(); });
 
 for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-touch]')) {
   const action = btn.dataset.touch as TouchAction;
-  const on = (e: Event) => { e.preventDefault(); touch.add(action); };
-  const off = (e: Event) => { e.preventDefault(); touch.delete(action); };
+  const on = (e: PointerEvent) => { e.preventDefault(); btn.setPointerCapture(e.pointerId); touch.add(action); };
+  const off = (e: PointerEvent) => { e.preventDefault(); touch.delete(action); if (btn.hasPointerCapture(e.pointerId)) btn.releasePointerCapture(e.pointerId); };
   btn.addEventListener('pointerdown', on);
   btn.addEventListener('pointerup', off);
   btn.addEventListener('pointercancel', off);
@@ -1073,6 +1116,7 @@ function loop(now: number) {
   const rawDt = Math.min((now - last) / 1000, .05);
   last = now;
 
+  pollControllerShortcuts();
   if (!paused) {
     accumulator += rawDt;
     while (accumulator >= FIXED) {
