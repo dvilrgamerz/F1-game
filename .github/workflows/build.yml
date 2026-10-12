@@ -25,6 +25,10 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Controller, steering and 7km circuit tests
+        run: npm test
+      - name: Python circuit and handling audit
+        run: python3 tools/handling_audit.py
       - name: Typecheck
         run: npm run typecheck
       - name: Production build
