@@ -20,9 +20,9 @@ renderer.toneMappingExposure = 1.05;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x7fb3db);
-scene.fog = new THREE.FogExp2(0x9fc3dd, 0.0018);
+scene.fog = new THREE.FogExp2(0x9fc3dd, 0.00045);
 
-const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.08, 2600);
+const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.08, 13000);
 
 const hemi = new THREE.HemisphereLight(0xddeeff, 0x42552f, 2.1);
 scene.add(hemi);
@@ -37,15 +37,22 @@ sun.shadow.camera.bottom = -250;
 scene.add(sun);
 
 const grass = new THREE.Mesh(
-  new THREE.PlaneGeometry(2200, 2200),
+  new THREE.PlaneGeometry(12000, 12000),
   new THREE.MeshStandardMaterial({ color: 0x487a32, roughness: 1 })
 );
 grass.rotation.x = -Math.PI / 2;
 grass.receiveShadow = true;
 scene.add(grass);
 
-const trackPoints = ARDENNE_GP.controlPoints.map(({ x, y, z }) => new THREE.Vector3(x, y, z));
-
+// Scale the original hand-designed circuit to its declared ~7 km route length,
+ // while retaining its original elevation (not multiplying the height).
+const rawTrackPoints = ARDENNE_GP.controlPoints.map(({ x, y, z }) => new THREE.Vector3(x, y, z));
+const originalTrack = new THREE.CatmullRomCurve3(rawTrackPoints, true, 'centripetal', 0.45);
+const initialScale = ARDENNE_GP.lengthMeters / originalTrack.getLength();
+const resizedTrack = (ratio: number) => rawTrackPoints.map(p => new THREE.Vector3(p.x * ratio, p.y, p.z * ratio));
+const firstPass = new THREE.CatmullRomCurve3(resizedTrack(initialScale), true, 'centripetal', 0.45);
+const scale = initialScale * ARDENNE_GP.lengthMeters / firstPass.getLength();
+const trackPoints = resizedTrack(scale);
 const trackCurve = new THREE.CatmullRomCurve3(trackPoints, true, 'centripetal', 0.45);
 const TRACK_LENGTH_METERS = trackCurve.getLength();
 const TRACK_WIDTH = ARDENNE_GP.widthMeters;
@@ -121,7 +128,7 @@ function addTrackEnvironment() {
   const markers = new THREE.InstancedMesh(markerGeo, markerMat, barrierCount);
   const treeGeo = new THREE.ConeGeometry(2.3, 7.5, 7);
   const treeMat = new THREE.MeshStandardMaterial({ color: 0x245c31, roughness: 1 });
-  const trees = new THREE.InstancedMesh(treeGeo, treeMat, 110);
+  const trees = new THREE.InstancedMesh(treeGeo, treeMat, 310);
   const dummy = new THREE.Object3D();
 
   for (let i = 0; i < barrierCount; i++) {
@@ -138,8 +145,8 @@ function addTrackEnvironment() {
     markers.setMatrixAt(i, dummy.matrix);
   }
 
-  for (let i = 0; i < 110; i++) {
-    const t = (i * .037 + .013) % 1;
+  for (let i = 0; i < 310; i++) {
+    const t = (i * 0.61803398875 + .013) % 1;
     const p = trackCurve.getPointAt(t);
     const tangent = trackCurve.getTangentAt(t).normalize();
     const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
