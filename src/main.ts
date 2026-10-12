@@ -47,6 +47,7 @@ scene.add(grass);
 const trackPoints = ARDENNE_GP.controlPoints.map(({ x, y, z }) => new THREE.Vector3(x, y, z));
 
 const trackCurve = new THREE.CatmullRomCurve3(trackPoints, true, 'centripetal', 0.45);
+const TRACK_LENGTH_METERS = trackCurve.getLength();
 const TRACK_WIDTH = ARDENNE_GP.widthMeters;
 const RACE_LAPS = ARDENNE_GP.laps;
 const TRACK_SAMPLES = 1400;
@@ -314,13 +315,13 @@ function createFormulaCar(bodyColor: number): THREE.Group {
   const carbon = new THREE.MeshStandardMaterial({ color: 0x111214, metalness: .2, roughness: .5 });
   const tyre = new THREE.MeshStandardMaterial({ color: 0x090909, roughness: .92 });
 
-  const floor = new THREE.Mesh(new THREE.BoxGeometry(1.85, .25, 4.5), carbon);
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(1.75, .22, 4.5), carbon);
   floor.position.y = .36;
   car.add(floor);
 
-  const nose = new THREE.Mesh(new THREE.BoxGeometry(.68, .4, 3.2), bodyMat);
-  nose.position.set(0, .62, -1.15);
-  nose.rotation.x = .02;
+  const nose = new THREE.Mesh(new THREE.CylinderGeometry(.48, .16, 3.2, 10), bodyMat);
+  nose.position.set(0, .64, -1.15);
+  nose.rotation.x = Math.PI / 2;
   car.add(nose);
 
   const cockpit = new THREE.Mesh(new THREE.BoxGeometry(1.2, .72, 1.7), bodyMat);
@@ -331,25 +332,25 @@ function createFormulaCar(bodyColor: number): THREE.Group {
   engine.position.set(0, .85, 1.55);
   car.add(engine);
 
-  const frontWing = new THREE.Mesh(new THREE.BoxGeometry(3.3, .12, .65), carbon);
+  const frontWing = new THREE.Mesh(new THREE.BoxGeometry(1.88, .12, .65), carbon);
   frontWing.position.set(0, .35, -2.62);
   car.add(frontWing);
-  const rearWing = new THREE.Mesh(new THREE.BoxGeometry(2.25, .16, .58), carbon);
+  const rearWing = new THREE.Mesh(new THREE.BoxGeometry(1.68, .16, .58), carbon);
   rearWing.position.set(0, 1.28, 2.4);
   car.add(rearWing);
 
   const rearEndplateGeo = new THREE.BoxGeometry(.10, .78, .72);
   const rearEndL = new THREE.Mesh(rearEndplateGeo, carbon);
-  rearEndL.position.set(-1.08, 1.02, 2.38);
+  rearEndL.position.set(-.82, 1.02, 2.38);
   const rearEndR = rearEndL.clone();
-  rearEndR.position.x = 1.08;
+  rearEndR.position.x = .82;
   car.add(rearEndL, rearEndR);
 
   const frontEndplateGeo = new THREE.BoxGeometry(.10, .46, .78);
   const frontEndL = new THREE.Mesh(frontEndplateGeo, carbon);
-  frontEndL.position.set(-1.58, .48, -2.62);
+  frontEndL.position.set(-.90, .48, -2.62);
   const frontEndR = frontEndL.clone();
-  frontEndR.position.x = 1.58;
+  frontEndR.position.x = .90;
   car.add(frontEndL, frontEndR);
 
   const diffuser = new THREE.Mesh(new THREE.BoxGeometry(1.62, .22, .82), carbon);
@@ -358,9 +359,9 @@ function createFormulaCar(bodyColor: number): THREE.Group {
   car.add(diffuser);
 
   const sidePodL = new THREE.Mesh(new THREE.BoxGeometry(.62, .48, 1.75), bodyMat);
-  sidePodL.position.set(-.77,.64,.62);
+  sidePodL.position.set(-.63,.64,.62);
   const sidePodR = sidePodL.clone();
-  sidePodR.position.x = .77;
+  sidePodR.position.x = .63;
   car.add(sidePodL, sidePodR);
 
   const haloBar = new THREE.Mesh(new THREE.BoxGeometry(1.05,.09,.09), carbon);
@@ -387,10 +388,10 @@ function createFormulaCar(bodyColor: number): THREE.Group {
   const suspensionMat = new THREE.MeshStandardMaterial({ color: 0x1a1c20, metalness: .55, roughness: .35 });
   const suspensionGeo = new THREE.BoxGeometry(.06, .06, 1.12);
   const suspensionPoints = [
-    [-.72, .56, -1.05, -1.02, .48, -1.66],
-    [.72, .56, -1.05, 1.02, .48, -1.66],
-    [-.68, .56, 1.10, -1.00, .48, 1.54],
-    [.68, .56, 1.10, 1.00, .48, 1.54],
+    [-.54, .56, -1.05, -.78, .48, -1.66],
+    [.54, .56, -1.05, .78, .48, -1.66],
+    [-.54, .56, 1.10, -.78, .48, 1.54],
+    [.54, .56, 1.10, .78, .48, 1.54],
   ] as const;
   for (const [x1,y1,z1,x2,y2,z2] of suspensionPoints) {
     const bar = new THREE.Mesh(suspensionGeo, suspensionMat);
@@ -406,7 +407,7 @@ function createFormulaCar(bodyColor: number): THREE.Group {
   const wheelGeo = new THREE.CylinderGeometry(.43, .43, .34, 24);
   wheelGeo.rotateZ(Math.PI / 2);
   const wheelLocs = [
-    [-1.05, .45, -1.72], [1.05, .45, -1.72], [-1.02, .45, 1.58], [1.02, .45, 1.58]
+    [-.78, .45, -1.72], [.78, .45, -1.72], [-.78, .45, 1.58], [.78, .45, 1.58]
   ];
   const rimGeo = new THREE.CylinderGeometry(.24, .24, .36, 18);
   rimGeo.rotateZ(Math.PI / 2);
@@ -415,25 +416,63 @@ function createFormulaCar(bodyColor: number): THREE.Group {
   brakeGeo.rotateZ(Math.PI / 2);
   const brakeMat = new THREE.MeshStandardMaterial({ color: 0x6b6b6b, metalness: .6, roughness: .5 });
 
+  const steeringPivots: THREE.Group[] = [];
+  const rollingWheels: THREE.Group[] = [];
   for (const [x, y, z] of wheelLocs) {
-    const w = new THREE.Mesh(wheelGeo, tyre);
-    w.position.set(x, y, z);
-    w.castShadow = true;
-    car.add(w);
+    const pivot = new THREE.Group();
+    pivot.position.set(x, y, z);
+    const spinning = new THREE.Group();
+    pivot.add(spinning);
+
+    const rubber = new THREE.Mesh(wheelGeo, tyre);
+    rubber.castShadow = true;
+    spinning.add(rubber);
 
     const rim = new THREE.Mesh(rimGeo, rimMat);
-    rim.position.set(x, y, z);
-    car.add(rim);
+    spinning.add(rim);
 
     const disc = new THREE.Mesh(brakeGeo, brakeMat);
-    disc.position.set(x, y, z);
-    car.add(disc);
+    spinning.add(disc);
+
+    // The car's front is local -Z; steering pivots rotate only the front axle.
+    if (z < 0) steeringPivots.push(pivot);
+    rollingWheels.push(spinning);
+    car.add(pivot);
   }
+  car.userData.steeringPivots = steeringPivots;
+  car.userData.rollingWheels = rollingWheels;
+
+  const intake = new THREE.Mesh(new THREE.CylinderGeometry(.28, .36, .42, 10), carbon);
+  intake.rotation.x = Math.PI / 2;
+  intake.position.set(0, 1.42, .82);
+  car.add(intake);
+
+  const cameraPod = new THREE.Mesh(new THREE.BoxGeometry(.24, .24, .38), bodyMat);
+  cameraPod.position.set(0, 1.72, .55);
+  car.add(cameraPod);
+  for (const sign of [-1, 1]) {
+    const mirror = new THREE.Mesh(new THREE.BoxGeometry(.26, .12, .14), carbon);
+    mirror.position.set(sign * .76, 1.04, -.24);
+    car.add(mirror);
+  }
+
+  const accentMat = new THREE.MeshStandardMaterial({ color: 0xf7f7f7, roughness: .4 });
+  const noseStripe = new THREE.Mesh(new THREE.BoxGeometry(.07, .025, 1.45), accentMat);
+  noseStripe.position.set(0, .89, -1.52);
+  car.add(noseStripe);
 
   car.traverse(obj => {
     if (obj instanceof THREE.Mesh) obj.castShadow = true;
   });
   return car;
+}
+
+function animateWheels(car: THREE.Group, frontWheelAngle: number, speed: number, dt: number): void {
+  const front = car.userData.steeringPivots as THREE.Group[] | undefined;
+  const rolling = car.userData.rollingWheels as THREE.Group[] | undefined;
+  for (const pivot of front ?? []) pivot.rotation.y = frontWheelAngle;
+  // Wheel radius 0.43 m; spin is purely visual, including in the pit lane.
+  for (const wheel of rolling ?? []) wheel.rotation.x -= (speed / .43) * dt;
 }
 
 interface DriverState {
@@ -724,6 +763,7 @@ function updatePitLane(dt: number, raceTime: number): boolean {
   player.heading = Math.atan2(tangent.x, tangent.z);
   player.car.position.copy(player.position);
   player.car.rotation.set(0, player.heading + Math.PI, 0);
+  animateWheels(player.car, 0, player.speed, dt);
 
   player.previousProgress = player.progress;
   const wrappedSpan = (1 - ARDENNE_GP.pitEntry) + ARDENNE_GP.pitExit;
@@ -842,6 +882,7 @@ function updatePlayer(dt: number, raceTime: number) {
   player.position.y = trackCurve.getPointAt(player.progress).y + .22;
   player.car.position.copy(player.position);
   player.car.rotation.set(0, player.heading + Math.PI, 0);
+  animateWheels(player.car, player.frontAngle, player.speed, dt);
 
   const heatIn = Math.abs(player.steer) * player.speed * .014 + player.brake * 5.8 + player.throttle * 1.3;
   const cooling = (player.tyreTemp - 82) * (.035 + player.speed * .00042);
@@ -867,7 +908,7 @@ function updateAI(dt: number, racing: boolean) {
       ai.speed = THREE.MathUtils.lerp(ai.speed, target, dt * 1.15);
       ai.lane = THREE.MathUtils.lerp(ai.lane, Math.sin(ai.progress * Math.PI * 10 + i * .8) * 1.65, dt * .55);
       const old = ai.progress;
-      ai.progress = (ai.progress + (ai.speed * dt) / trackCurve.getLength()) % 1;
+      ai.progress = (ai.progress + (ai.speed * dt) / TRACK_LENGTH_METERS) % 1;
       if (old > .95 && ai.progress < .05) ai.lap++;
     }
     const p = trackCurve.getPointAt(ai.progress);
@@ -877,6 +918,7 @@ function updateAI(dt: number, racing: boolean) {
     p.y += .22;
     ai.car.position.copy(p);
     ai.car.rotation.y = Math.atan2(tangent.x, tangent.z) + Math.PI;
+    animateWheels(ai.car, 0, ai.speed, dt);
   }
 }
 
