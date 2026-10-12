@@ -976,6 +976,10 @@ const els = {
   gear: document.querySelector<HTMLElement>('#gear')!,
   throttle: document.querySelector<HTMLElement>('#throttle-bar')!,
   brake: document.querySelector<HTMLElement>('#brake-bar')!,
+  steerIndicator: document.querySelector<HTMLElement>('#steer-indicator')!,
+  steerText: document.querySelector<HTMLElement>('#steer-text')!,
+  gforceBar: document.querySelector<HTMLElement>('#gforce-bar')!,
+  gforce: document.querySelector<HTMLElement>('#g-force')!,
   ers: document.querySelector<HTMLElement>('#ers-bar')!,
   tyre: document.querySelector<HTMLElement>('#tyre-bar')!,
   ersText: document.querySelector<HTMLElement>('#ers-text')!,
@@ -1117,6 +1121,10 @@ function updateHUD(raceTime: number, now: number) {
   els.gear.textContent = gearForSpeed(player.speed);
   els.throttle.style.width = `${player.throttle * 100}%`;
   els.brake.style.width = `${player.brake * 100}%`;
+  els.steerIndicator.style.left = `${50 + player.steer * 48}%`;
+  els.steerText.textContent = `${Math.round(THREE.MathUtils.radToDeg(player.frontAngle))}°`;
+  els.gforceBar.style.width = `${THREE.MathUtils.clamp(player.lateralG / 5,0,1)*100}%`;
+  els.gforce.textContent = `${player.lateralG.toFixed(1)}g`;
   els.ers.style.width = `${player.ers * 100}%`;
   els.tyre.style.width = `${player.tyre * 100}%`;
   els.temp.style.width = `${THREE.MathUtils.clamp((player.tyreTemp-65)/65,0,1)*100}%`;
