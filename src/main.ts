@@ -831,7 +831,7 @@ function updatePlayer(dt: number, raceTime: number) {
   player.throttle = THREE.MathUtils.lerp(player.throttle, throttleTarget, 1 - Math.exp(-dt * 10));
   player.brake = THREE.MathUtils.lerp(player.brake, brakeTarget, 1 - Math.exp(-dt * 14));
   player.steer = THREE.MathUtils.lerp(player.steer, steerTarget, 1 - Math.exp(-dt * 13));
-  player.ersDeploy = (keys.has('Space') || touch.has('ers') || pad?.ers) && player.ers > .005;
+  player.ersDeploy = (keys.has('Space') || touch.has('ers') || pad?.ers === true) && player.ers > .005;
 
   if (updatePitLane(dt, raceTime)) return;
 
