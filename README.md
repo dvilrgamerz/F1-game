@@ -1,3 +1,8 @@
+<!-- DVILR PROJECT COVER v1 -->
+<p align="center"><img src="./assets/dvilr-project-banner.svg" width="100%" alt="DVILR GP: An evolving 3D formula-style racing game." /></p>
+<p align="center"><a href="https://github.com/dvilrgamerz"><strong>Developer profile</strong></a> · <a href="https://github.com/dvilrgamerz/F1-game"><strong>Source</strong></a></p>
+<!-- /DVILR PROJECT COVER -->
+
 # DVILR GP — Web Formula Racing V3 Alpha
 
 DVILR GP is an original browser-based open-wheel racing project built with Three.js, TypeScript and Vite. V3 begins the transition from the V2 kinematic prototype to a much more physically grounded Formula-style racing architecture.
