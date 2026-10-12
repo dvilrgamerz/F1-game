@@ -207,3 +207,11 @@ button { font: inherit; }
   }
   .pit-panel button { padding: 8px; font-size: 10px; }
 }
+
+/* Steering and lateral-load telemetry, plus the larger circuit navigator. */
+.steer-track{height:8px;background:rgba(255,255,255,.13);border-radius:12px;position:relative;overflow:hidden}
+.steer-track::before{content:"";position:absolute;left:50%;height:100%;width:2px;background:rgba(255,255,255,.55);z-index:2}
+.steer-track i{position:absolute;left:50%;top:0;width:3px;height:100%;background:#66e9a3;box-shadow:0 0 7px #66e9a3;transition:left .04s linear}
+#gforce-bar{background:linear-gradient(90deg,#38dca3,#f8c158,#fc5353)}
+#minimap{width:220px;height:150px;background:#08101c;box-shadow:0 14px 36px rgba(0,0,0,.35)}
+@media (pointer:coarse),(max-width:800px){#minimap{width:144px;height:100px;top:60px;right:8px}}
