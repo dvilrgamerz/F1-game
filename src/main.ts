@@ -1017,29 +1017,95 @@ function formatTime(seconds: number) {
 }
 
 const minimapCtx = els.minimap.getContext('2d');
-function drawMinimap() {
-  if (!minimapCtx) return;
-  const w = els.minimap.width, h = els.minimap.height;
-  minimapCtx.clearRect(0,0,w,h);
-  minimapCtx.strokeStyle = 'rgba(255,255,255,.42)';
-  minimapCtx.lineWidth = 5;
-  minimapCtx.lineCap = 'round';
-  minimapCtx.beginPath();
-  const xs = centerline.map(p=>p.x), zs = centerline.map(p=>p.z);
-  const minX=Math.min(...xs), maxX=Math.max(...xs), minZ=Math.min(...zs), maxZ=Math.max(...zs);
-  const project=(p:THREE.Vector3)=>({
-    x: 12+(p.x-minX)/(maxX-minX)*(w-24),
-    y: 10+(p.z-minZ)/(maxZ-minZ)*(h-20)
+const minimapBg = document.createElement('canvas');
+minimapBg.width = els.minimap.width;
+minimapBg.height = els.minimap.height;
+const mapXs = centerline.map(p => p.x);
+const mapZs = centerline.map(p => p.z);
+const mapMinX = Math.min(...mapXs);
+const mapMaxX = Math.max(...mapXs);
+const mapMinZ = Math.min(...mapZs);
+const mapMaxZ = Math.max(...mapZs);
+// Uniform scale keeps the circuit's shape honest, even on narrow phones.
+const mapScale = Math.min(
+  (els.minimap.width - 22) / Math.max(1, mapMaxX - mapMinX),
+  (els.minimap.height - 24) / Math.max(1, mapMaxZ - mapMinZ)
+);
+const mapOriginX = (els.minimap.width - (mapMaxX - mapMinX) * mapScale) / 2;
+const mapOriginY = (els.minimap.height - (mapMaxZ - mapMinZ) * mapScale) / 2;
+function projectMap(p: THREE.Vector3): { x: number; y: number } {
+  return { x: mapOriginX + (p.x - mapMinX) * mapScale, y: mapOriginY + (p.z - mapMinZ) * mapScale };
+}
+function renderMapBase(): void {
+  const ctx = minimapBg.getContext('2d');
+  if (!ctx) return;
+  const width = minimapBg.width, height = minimapBg.height;
+  ctx.fillStyle = '#080f1b';
+  ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = 'rgba(210,233,255,.22)';
+  ctx.lineWidth = 8;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  centerline.forEach((p, i) => {
+    const q = projectMap(p);
+    if (i === 0) ctx.moveTo(q.x, q.y);
+    else ctx.lineTo(q.x, q.y);
   });
-  centerline.forEach((p,i)=>{ const q=project(p); if(i===0) minimapCtx.moveTo(q.x,q.y); else minimapCtx.lineTo(q.x,q.y); });
-  minimapCtx.closePath(); minimapCtx.stroke();
+  ctx.closePath();
+  ctx.stroke();
+  ctx.strokeStyle = '#b9c8d5';
+  ctx.lineWidth = 3;
+  ctx.stroke();
 
-  const pp=project(player.position);
-  minimapCtx.fillStyle='#ff314f'; minimapCtx.beginPath(); minimapCtx.arc(pp.x,pp.y,5,0,Math.PI*2); minimapCtx.fill();
-  minimapCtx.fillStyle='rgba(255,255,255,.75)';
-  for(let i=0;i<aiCars.length;i+=3){
-    const q=project(aiCars[i].car.position); minimapCtx.beginPath(); minimapCtx.arc(q.x,q.y,2.3,0,Math.PI*2); minimapCtx.fill();
+  // Data-driven DRS sections, green on the track map.
+  for (const zone of ARDENNE_GP.drsZones) {
+    ctx.strokeStyle = '#54eca3';
+    ctx.lineWidth = 3.7;
+    ctx.beginPath();
+    for (let i = Math.ceil(zone.activationStart * TRACK_SAMPLES); i <= Math.floor(zone.activationEnd * TRACK_SAMPLES); i++) {
+      const q = projectMap(centerline[i % TRACK_SAMPLES]);
+      if (i === Math.ceil(zone.activationStart * TRACK_SAMPLES)) ctx.moveTo(q.x, q.y);
+      else ctx.lineTo(q.x, q.y);
+    }
+    ctx.stroke();
   }
+  const start = projectMap(centerline[0]);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(start.x - 3, start.y - 3, 6, 6);
+  ctx.font = 'bold 9px system-ui,sans-serif';
+  ctx.fillStyle = '#e2f5ff';
+  ctx.fillText('ARDENNE GP', 8, 12);
+  ctx.font = '8px system-ui,sans-serif';
+  ctx.fillStyle = '#8da5b9';
+  ctx.fillText((TRACK_LENGTH_METERS / 1000).toFixed(2) + ' KM', 8, height - 6);
+}
+renderMapBase();
+function drawMinimap(): void {
+  if (!minimapCtx) return;
+  minimapCtx.drawImage(minimapBg, 0, 0);
+  // Render other cars without recalculating the full circuit path every frame.
+  minimapCtx.fillStyle = '#89adcf';
+  for (const ai of aiCars) {
+    const q = projectMap(ai.car.position);
+    minimapCtx.beginPath();
+    minimapCtx.arc(q.x, q.y, 1.8, 0, Math.PI * 2);
+    minimapCtx.fill();
+  }
+  const current = projectMap(player.position);
+  minimapCtx.save();
+  minimapCtx.translate(current.x, current.y);
+  minimapCtx.rotate(-player.heading);
+  minimapCtx.fillStyle = '#ff425e';
+  minimapCtx.beginPath();
+  minimapCtx.moveTo(0, 7);
+  minimapCtx.lineTo(-5, -4);
+  minimapCtx.lineTo(5, -4);
+  minimapCtx.closePath();
+  minimapCtx.fill();
+  minimapCtx.strokeStyle = '#fff';
+  minimapCtx.lineWidth = 1.2;
+  minimapCtx.stroke();
+  minimapCtx.restore();
 }
 
 function updateHUD(raceTime: number, now: number) {
